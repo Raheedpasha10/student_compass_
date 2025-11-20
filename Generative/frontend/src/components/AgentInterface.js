@@ -13,7 +13,7 @@ const AgentInterface = () => {
 
   const checkAgentStatus = async () => {
     try {
-      const response = await fetch('http://localhost:8001/agents/status');
+      const response = await fetch(`${process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8001'}/agents/status`);
       const status = await response.json();
       setAgentStatus(status);
     } catch (error) {
@@ -31,7 +31,7 @@ const AgentInterface = () => {
     setAnalysis(null);
 
     try {
-      const response = await fetch('http://localhost:8001/agents/analyze', {
+      const response = await fetch(`${process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8001'}/agents/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

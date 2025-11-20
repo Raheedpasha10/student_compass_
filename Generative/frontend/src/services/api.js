@@ -31,7 +31,7 @@ tokenManager.initializeToken();
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'http://localhost:8001', // Updated to new port 8001
+  baseURL: process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8001', // Use relative URL in production
   timeout: 30000, // 30 seconds timeout for AI requests
   headers: {
     'Content-Type': 'application/json',
