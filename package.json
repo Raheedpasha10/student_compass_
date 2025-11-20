@@ -2,8 +2,13 @@
   "name": "student-compass",
   "version": "1.0.0",
   "scripts": {
-    "build": "cd Generative/frontend && npm install && NODE_OPTIONS=\"--localstorage-file=/tmp/localstorage-build\" npm run build && cp -r build/* ../../",
-    "dev": "cd Generative && python main.py"
+    "build": "cd Generative/frontend && npm ci && DISABLE_ESLINT_PLUGIN=true npm run build",
+    "dev": "cd Generative && python main.py",
+    "install": "cd Generative/frontend && npm install"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  }
 }
