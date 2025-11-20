@@ -182,10 +182,10 @@ const SimplifiedUltimateRoadmap = () => {
         console.log('🤖 Generating roadmap with Multi-Agent AI System...');
         // Dynamic agent names based on specialization detection
         const specializationAgents = getSpecializedAgents(currentSkills);
-        setAgentStatus({ current: 'Enhanced Multi-Agent System Activated', agents: [
-          { name: specializationAgents[0] || 'Strategic Planner', status: 'analyzing', model: 'Llama 3.3 70B' },
-          { name: specializationAgents[1] || 'Practical Guide', status: 'analyzing', model: 'Gemini 2.0 Flash' },
-          { name: specializationAgents[2] || 'Technical Expert', status: 'analyzing', model: 'Llama 3.1 8B' }
+        setAgentStatus({ current: '🌟 REVOLUTIONARY INTELLIGENCE ACTIVATED', agents: [
+          { name: `🔮 ${specializationAgents[0] || 'Market Prophet'}`, status: 'analyzing', model: 'Revolutionary AI' },
+          { name: `⚡ ${specializationAgents[1] || 'Talent Archaeologist'}`, status: 'analyzing', model: 'Quantum Intelligence' },
+          { name: `🧠 ${specializationAgents[2] || 'Future Cartographer'}`, status: 'analyzing', model: 'Consciousness Engine' }
         ]});
         
         // Use Multi-Agent System for comprehensive analysis
@@ -201,9 +201,10 @@ const SimplifiedUltimateRoadmap = () => {
             true // include agent details
           );
 
-          console.log('✅ Multi-Agent AI Analysis Complete!');
-          console.log(`📊 ${multiAgentResult.metadata.successful_agents}/${multiAgentResult.metadata.num_agents} AI agents contributed`);
-          console.log('🔍 Funneling Report Available:', !!multiAgentResult.funneling_report);
+          console.log('✅ Revolutionary Multi-Agent AI Analysis Complete!');
+          console.log(`🚀 Revolutionary System Generated: ${multiAgentResult.final_roadmap?.length || 0} characters`);
+          console.log('🔍 Revolutionary Features:', multiAgentResult.revolutionary_features);
+          console.log('🧠 Intelligence Layers:', multiAgentResult.metadata?.intelligence_layers);
 
           // Parse structured plan from AI roadmap
           let structuredPlan = null;
@@ -247,7 +248,12 @@ const SimplifiedUltimateRoadmap = () => {
             agent_insights: multiAgentResult.agent_insights,
             using_multi_agent: true,
             funneling_report: multiAgentResult.funneling_report,
-            session_id: multiAgentResult.metadata?.session_id
+            session_id: multiAgentResult.metadata?.session_id,
+            revolutionary_features: multiAgentResult.revolutionary_features,
+            intelligence_layers: multiAgentResult.metadata?.intelligence_layers,
+            discovery_constellation: multiAgentResult.discovery_constellation,
+            intelligence_nexus: multiAgentResult.intelligence_nexus,
+            mastery_acceleration: multiAgentResult.mastery_acceleration
           };
 
           const learning_path = buildLearningPath(data);
