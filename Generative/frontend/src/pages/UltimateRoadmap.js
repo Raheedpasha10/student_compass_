@@ -255,15 +255,11 @@ const SimplifiedUltimateRoadmap = () => {
           } catch {}
 
         } catch (multiAgentError) {
-          console.warn('Multi-agent system failed, falling back to standard system:', multiAgentError);
+          console.error('Multi-agent API error - keeping multi-agent response:', multiAgentError);
           
-          // Fallback to old system
-          const data = await careerAPI.analyzeCareer(currentSkills, currentExpertise);
-          const learning_path = buildLearningPath(data);
-          const finalData = { ...data, learning_path: learning_path || [] };
-          setRoadmapData(finalData);
+          // DO NOT fallback to old API - this causes demo data override!
+          // Keep the multi-agent data that was already set above
           setUsingDemoData(false);
-          try { sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: finalData })); } catch {}
         }
         
       } catch (err) {
