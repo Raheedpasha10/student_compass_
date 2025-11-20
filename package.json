@@ -1,0 +1,9 @@
+{
+  "name": "student-compass",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd Generative/frontend && npm install && NODE_OPTIONS=\"--localstorage-file=/tmp/localstorage-build\" npm run build && cp -r build/* ../../",
+    "dev": "cd Generative && python main.py"
+  },
+  "dependencies": {}
+}

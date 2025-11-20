@@ -604,54 +604,6 @@
   box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.25);
 }
 
-/* Floating elements container */
-.floating-elements {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.float-1, .float-2, .float-3 {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.1;
-  animation: float 6s ease-in-out infinite;
-}
-
-.float-1 {
-  width: 200px;
-  height: 200px;
-  top: 10%;
-  left: 5%;
-  background: linear-gradient(135deg, #60a5fa, #818cf8);
-  animation-duration: 8s;
-}
-
-.float-2 {
-  width: 150px;
-  height: 150px;
-  bottom: 15%;
-  right: 10%;
-  background: linear-gradient(135deg, #c084fc, #8b5cf6);
-  animation-duration: 10s;
-  animation-delay: 1s;
-}
-
-.float-3 {
-  width: 100px;
-  height: 100px;
-  top: 40%;
-  right: 20%;
-  background: linear-gradient(135deg, #3b82f6, #60a5fa);
-  animation-duration: 12s;
-  animation-delay: 2s;
-}
-
 /* Enhanced professional background */
 .professional-background {
   position: relative;
@@ -699,11 +651,6 @@
   transition: all 0.3s ease;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-}
-
-body.light .enhanced-gradient-border {
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(226, 232, 240, 0.7);
 }
 
 body.dark .enhanced-gradient-border {
@@ -801,11 +748,6 @@ body.dark .enhanced-gradient-border {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-body.light .enhanced-glass {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 body.dark .enhanced-glass {

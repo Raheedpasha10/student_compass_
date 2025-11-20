@@ -11,7 +11,7 @@ from models.schemas import AnalyzeRequest, AnalyzeResponse, CareerPath, RoadmapS
 
 class TestAnalyzeRoutes:
     """Test cases for analyze routes"""
-    
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_analyze_career_paths_with_request_data(self, client, mock_ai_service):
@@ -20,7 +20,7 @@ class TestAnalyzeRoutes:
             "skills": "Python, Machine Learning, Data Analysis",
             "expertise": "Advanced"
         }
-        
+
         # Mock AI service response
         mock_analysis = {
             "career_paths": [
@@ -58,24 +58,24 @@ class TestAnalyzeRoutes:
                 }
             ]
         }
-        
+
         with patch.object(ai_service, 'generate_career_analysis', return_value=mock_analysis):
             response = client.post("/analyze", json=request_data)
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "career_paths" in data
         assert "selected_path" in data
         assert "roadmap" in data
         assert "courses" in data
-        
+
         assert len(data["career_paths"]) == 1
         assert data["career_paths"][0]["title"] == "Data Scientist"
         assert data["selected_path"]["title"] == "Data Scientist"
         assert len(data["roadmap"]) == 1
         assert len(data["courses"]) == 1
-    
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_analyze_career_paths_with_user_profile(self, client, mock_ai_service, sample_user_data):
@@ -90,10 +90,10 @@ class TestAnalyzeRoutes:
             created_at=None,
             updated_at=None
         )
-        
+
         # Request without skills/expertise (should use user profile)
         request_data = {}
-        
+
         mock_analysis = {
             "career_paths": [
                 {
@@ -130,36 +130,36 @@ class TestAnalyzeRoutes:
                 }
             ]
         }
-        
+
         with patch('routes.analyze.get_current_user', return_value=mock_user), \
              patch.object(ai_service, 'generate_career_analysis', return_value=mock_analysis) as mock_generate:
-            
+
             response = client.post("/analyze", json=request_data)
-        
+
         assert response.status_code == 200
-        
+
         # Verify AI service was called with user's profile data
         mock_generate.assert_called_once_with(
-            sample_user_data["skills"], 
+            sample_user_data["skills"],
             sample_user_data["expertise"]
         )
-        
+
         data = response.json()
         assert data["selected_path"]["title"] == "Full Stack Developer"
-    
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_analyze_missing_skills_and_expertise(self, client):
         """Test career analysis with missing skills and expertise"""
         request_data = {}  # No skills or expertise
-        
+
         # Mock no authenticated user
         with patch('routes.analyze.get_current_user', return_value=None):
             response = client.post("/analyze", json=request_data)
-        
+
         assert response.status_code == 400
         assert "Skills and expertise are required" in response.json()["detail"]
-    
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_analyze_request_data_overrides_user_profile(self, client, mock_ai_service, sample_user_data):
@@ -174,33 +174,33 @@ class TestAnalyzeRoutes:
             created_at=None,
             updated_at=None
         )
-        
+
         # Request with specific skills/expertise
         request_data = {
             "skills": "New Skills, Advanced Techniques",
             "expertise": "Expert"
         }
-        
+
         mock_analysis = {
             "career_paths": [{"title": "Expert Developer", "description": "Expert level development", "required_skills": [], "salary_range": "$100k+", "growth_prospect": "High", "market_demand": "High"}],
             "selected_path": {"title": "Expert Developer", "description": "Expert level development", "required_skills": [], "salary_range": "$100k+", "growth_prospect": "High", "market_demand": "High"},
             "roadmap": [{"phase": "Advanced", "duration": "1 month", "topics": [], "resources": []}],
             "courses": [{"title": "Advanced Course", "provider": "Expert Academy", "duration": "20 hours", "level": "Expert"}]
         }
-        
+
         with patch('routes.analyze.get_current_user', return_value=mock_user), \
              patch.object(ai_service, 'generate_career_analysis', return_value=mock_analysis) as mock_generate:
-            
+
             response = client.post("/analyze", json=request_data)
-        
+
         assert response.status_code == 200
-        
+
         # Verify AI service was called with request data, not user profile
         mock_generate.assert_called_once_with(
-            "New Skills, Advanced Techniques", 
+            "New Skills, Advanced Techniques",
             "Expert"
         )
-    
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_analyze_ai_service_error(self, client):
@@ -209,15 +209,15 @@ class TestAnalyzeRoutes:
             "skills": "Python, JavaScript",
             "expertise": "Intermediate"
         }
-        
+
         # Mock AI service failure
         with patch.object(ai_service, 'generate_career_analysis', side_effect=Exception("AI service unavailable")):
             response = client.post("/analyze", json=request_data)
-        
+
         assert response.status_code == 500
         assert "Error analyzing career paths" in response.json()["detail"]
         assert "AI service unavailable" in response.json()["detail"]
-    
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_analyze_partial_skills_from_user(self, client, mock_ai_service):
@@ -231,32 +231,32 @@ class TestAnalyzeRoutes:
             created_at=None,
             updated_at=None
         )
-        
+
         request_data = {
             "skills": "Python, Machine Learning"
             # No expertise in request
         }
-        
+
         mock_analysis = {
             "career_paths": [{"title": "ML Engineer", "description": "ML development", "required_skills": [], "salary_range": "$90k+", "growth_prospect": "High", "market_demand": "High"}],
             "selected_path": {"title": "ML Engineer", "description": "ML development", "required_skills": [], "salary_range": "$90k+", "growth_prospect": "High", "market_demand": "High"},
             "roadmap": [{"phase": "ML Basics", "duration": "2 months", "topics": [], "resources": []}],
             "courses": [{"title": "ML Course", "provider": "ML Academy", "duration": "40 hours", "level": "Advanced"}]
         }
-        
+
         with patch('routes.analyze.get_current_user', return_value=mock_user), \
              patch.object(ai_service, 'generate_career_analysis', return_value=mock_analysis) as mock_generate:
-            
+
             response = client.post("/analyze", json=request_data)
-        
+
         assert response.status_code == 200
-        
+
         # Should use skills from request and expertise from user
         mock_generate.assert_called_once_with(
             "Python, Machine Learning",
             "Advanced"
         )
-    
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_analyze_empty_strings_validation(self, client):
@@ -265,13 +265,13 @@ class TestAnalyzeRoutes:
             "skills": "",
             "expertise": ""
         }
-        
+
         with patch('routes.analyze.get_current_user', return_value=None):
             response = client.post("/analyze", json=request_data)
-        
+
         assert response.status_code == 400
         assert "Skills and expertise are required" in response.json()["detail"]
-    
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_analyze_response_model_validation(self, client, mock_ai_service):
@@ -280,7 +280,7 @@ class TestAnalyzeRoutes:
             "skills": "Python",
             "expertise": "Beginner"
         }
-        
+
         # Mock incomplete AI response (missing required fields)
         incomplete_analysis = {
             "career_paths": [
@@ -296,10 +296,10 @@ class TestAnalyzeRoutes:
             "roadmap": [],
             "courses": []
         }
-        
+
         with patch.object(ai_service, 'generate_career_analysis', return_value=incomplete_analysis):
             response = client.post("/analyze", json=request_data)
-        
+
         # Should return 500 due to validation error when creating Pydantic models
         assert response.status_code == 500
         assert "Error analyzing career paths" in response.json()["detail"]

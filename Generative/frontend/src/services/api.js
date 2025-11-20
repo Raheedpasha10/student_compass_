@@ -177,27 +177,6 @@ export const careerAPI = {
     }
   },
 
-  // Chat endpoints
-  chat: async (message) => {
-    try {
-      const response = await api.post('/chat/', { message });
-      return response.data;
-    } catch (error) {
-      console.error('Chat error:', error);
-      throw error;
-    }
-  },
-
-  updateSkillsViaChat: async (message) => {
-    try {
-      const response = await api.post('/chat/update-skills', { message });
-      return response.data;
-    } catch (error) {
-      console.error('Chat update skills error:', error);
-      throw error;
-    }
-  },
-
   // Skills endpoints
   updateSkills: async (userId, message) => {
     try {
@@ -208,6 +187,39 @@ export const careerAPI = {
       return response.data;
     } catch (error) {
       console.error('Update skills error:', error);
+      throw error;
+    }
+  },
+
+ // Multi-Agent Roadmap Generation (NEW V2 Endpoint)
+  generateMultiAgentRoadmap: async (query, background = null, includeAgentDetails = true) => {
+    try {
+      const requestData = {
+        query,
+        include_agent_details: includeAgentDetails
+      };
+      
+      if (background) {
+        requestData.background = background;
+      }
+      
+      console.log('🤖 Generating multi-agent roadmap:', requestData);
+      const response = await api.post('/api/v2/roadmap/generate', requestData);
+      console.log('✅ Multi-agent roadmap generated:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Multi-agent roadmap error:', error);
+      throw error;
+    }
+  },
+
+  // Check multi-agent system health
+  checkMultiAgentHealth: async () => {
+    try {
+      const response = await api.get('/api/v2/roadmap/health');
+      return response.data;
+    } catch (error) {
+      console.error('Multi-agent health check error:', error);
       throw error;
     }
   },
@@ -247,6 +259,23 @@ export const careerAPI = {
     } catch (error) {
       console.error('Supported technologies error:', error);
       throw error;
+    }
+  },
+
+  // Resource search (web search backed)
+  searchResources: async (type, topic, limit = 20, level = 'intermediate') => {
+    try {
+      const response = await api.post('/resources/search', {
+        type,
+        topic,
+        limit,
+        level,
+      });
+      return response.data?.results || [];
+    } catch (error) {
+      console.error('Resource search error:', error);
+      // Graceful fallback: empty list
+      return [];
     }
   },
 

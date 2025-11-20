@@ -2,20 +2,22 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from services.ai_service import AIService
 from typing import List, Dict, Any
-import re
 
 router = APIRouter(tags=["ai-search"])
 # Move AIService initialization inside the function to ensure proper environment loading
 # ai_service = AIService()  # This line will be removed
 
+
 class SkillSuggestionRequest(BaseModel):
     query: str
     max_suggestions: int = 8
+
 
 class SkillSuggestionResponse(BaseModel):
     suggestions: List[str]
     categories: List[str]
     confidence: float
+
 
 class EnhancedAnalysisRequest(BaseModel):
     skills: str
@@ -29,14 +31,14 @@ async def suggest_skills(request: SkillSuggestionRequest):
     """
     try:
         query = request.query.strip().lower()
-        
+
         if len(query) < 2:
             return SkillSuggestionResponse(
                 suggestions=[],
                 categories=[],
                 confidence=0.0
             )
-        
+
         # Enhanced skill database covering ALL technologies
         comprehensive_skills = {
             'Programming Languages': [
@@ -100,32 +102,32 @@ async def suggest_skills(request: SkillSuggestionRequest):
                 'Business Analysis', 'Requirements Gathering', 'Stakeholder Management'
             ]
         }
-        
+
         # Smart skill matching with fuzzy search
         suggestions = []
         matched_categories = []
-        
+
         for category, skills in comprehensive_skills.items():
             for skill in skills:
                 # Multiple matching strategies
                 skill_lower = skill.lower()
-                if (query in skill_lower or 
+                if (query in skill_lower or
                     any(word in skill_lower for word in query.split()) or
                     skill_lower.startswith(query) or
                     any(skill_lower.startswith(word) for word in query.split())):
-                    
+
                     if skill not in suggestions:
                         suggestions.append(skill)
                         if category not in matched_categories:
                             matched_categories.append(category)
-        
+
         # Sort by relevance (exact matches first, then partial matches)
         exact_matches = [s for s in suggestions if query == s.lower()]
         starts_with = [s for s in suggestions if s.lower().startswith(query) and s not in exact_matches]
         contains = [s for s in suggestions if query in s.lower() and s not in exact_matches and s not in starts_with]
-        
+
         sorted_suggestions = (exact_matches + starts_with + contains)[:request.max_suggestions]
-        
+
         # Calculate confidence based on match quality
         confidence = 0.0
         if exact_matches:
@@ -136,13 +138,13 @@ async def suggest_skills(request: SkillSuggestionRequest):
             confidence = 0.6
         elif suggestions:
             confidence = 0.4
-        
+
         return SkillSuggestionResponse(
             suggestions=sorted_suggestions,
             categories=matched_categories[:5],  # Limit categories
             confidence=confidence
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating skill suggestions: {str(e)}")
 
@@ -154,33 +156,33 @@ async def enhance_analysis_with_ai(request: EnhancedAnalysisRequest):
     try:
         # Initialize AIService inside the function to ensure environment variables are loaded
         ai_service = AIService()
-        
+
         # Use the existing AI service with enhanced prompting
         enhanced_prompt = f"""
         Analyze the following skills and expertise for career guidance:
-        
+
         Skills: {request.skills}
         Expertise Level: {request.expertise}
         User Preferences: {request.preferences}
-        
+
         Provide comprehensive career analysis covering:
         1. All relevant career paths across different domains (not just software development)
         2. Skills assessment with gap analysis
         3. Personalized learning roadmap
         4. Industry trends and growth prospects
         5. Salary expectations by region
-        
+
         Consider ALL programming languages, frameworks, and technologies mentioned.
         Include emerging fields like Web3, AI/ML, Cybersecurity, Game Development, etc.
-        
+
         Format the response as detailed JSON with career_paths, selected_path, roadmap, and courses.
         """
-        
+
         # Call the AI service with enhanced context
         analysis = ai_service.generate_career_analysis(request.skills, request.expertise)
-        
+
         return analysis
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error enhancing analysis with AI: {str(e)}")
 
@@ -252,19 +254,19 @@ async def get_supported_technologies():
             'Business Analysis', 'Requirements Gathering', 'Stakeholder Management'
         ]
     }
-    
+
     # Flatten all skills into a single list
     all_skills = []
     for category, skills in comprehensive_skills.items():
         all_skills.extend(skills)
-    
+
     return {
         "total_technologies": len(all_skills),
         "programming_languages": len(comprehensive_skills['Programming Languages']),
         "frameworks": len(comprehensive_skills['Frontend Frameworks']) + len(comprehensive_skills['Backend Frameworks']),
         "career_domains": [
             "Software Development",
-            "Data Science & Analytics", 
+            "Data Science & Analytics",
             "Mobile Development",
             "Game Development",
             "DevOps & Cloud Engineering",

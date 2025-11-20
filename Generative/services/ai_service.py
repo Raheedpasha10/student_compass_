@@ -22,16 +22,16 @@ except ImportError:
         @staticmethod
         def init(*args, **kwargs):
             pass
-    
+
     class DummyFirestore:
         class Client:
             def __init__(self, *args, **kwargs):
                 pass
-    
+
     class GenerativeModelClass:
         def __init__(self, *args, **kwargs):
             pass
-        
+
         def generate_content(self, *args, **kwargs):
             class DummyResponse:
                 def __init__(self):
@@ -51,22 +51,24 @@ except ImportError:
         @staticmethod
         def configure(*args, **kwargs):
             pass
-        
+
         class GenerativeModel:
             def __init__(self, *args, **kwargs):
                 pass
-            
+
             def generate_content(self, *args, **kwargs):
                 class DummyResponse:
                     def __init__(self):
                         self.text = ""
                 return DummyResponse()
-    
+
     genai_module = DummyGenai()
 
 from models.schemas import CareerPath, Course, RoadmapStep, MockTestQuestion
 
 # Currency conversion utility
+
+
 def convert_usd_to_inr(usd_range: str) -> str:
     """
     Convert USD salary range to INR
@@ -77,7 +79,7 @@ def convert_usd_to_inr(usd_range: str) -> str:
     """
     # Exchange rate: 1 USD = 88.09 INR (current rate)
     USD_TO_INR = 88.09
-    
+
     # Extract numbers from USD range - use proper regex
     numbers = re.findall(r'\$([0-9,]+)', usd_range)
     if len(numbers) >= 2:
@@ -85,11 +87,11 @@ def convert_usd_to_inr(usd_range: str) -> str:
             # Remove commas and convert to int
             usd_min = int(numbers[0].replace(',', ''))
             usd_max = int(numbers[1].replace(',', ''))
-            
+
             # Convert to INR
             inr_min = usd_min * USD_TO_INR
             inr_max = usd_max * USD_TO_INR
-            
+
             # Format as Indian currency (with lakhs format)
             def format_inr(amount):
                 # Convert to lakhs format for better readability
@@ -110,24 +112,25 @@ def convert_usd_to_inr(usd_range: str) -> str:
                 else:
                     # Format with commas for amounts less than 1 lakh
                     return f"₹{amount:,}"
-            
+
             return f"{format_inr(inr_min)} - {format_inr(inr_max)}"
-            
+
         except ValueError:
             return usd_range  # Return original if conversion fails
-    
+
     return usd_range  # Return original if parsing fails
+
 
 class AIService:
     """Service for handling AI-related operations with multiple AI provider fallbacks"""
-    
+
     def __init__(self):
         """Initialize the AI service with Vertex AI as primary and fallbacks"""
         self.project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "your-project-id")
         self.vertex_ai_available = VERTEX_AI_AVAILABLE
         self.model = None
         self.firestore_client = None
-        
+
         # Initialize Vertex AI if available
         if self.vertex_ai_available:
             try:
@@ -137,7 +140,7 @@ class AIService:
             except Exception as e:
                 print(f"Warning: Could not initialize Vertex AI: {e}")
                 self.vertex_ai_available = False
-        
+
         # Initialize Firestore client with error handling
         if self.vertex_ai_available:
             try:
@@ -145,7 +148,7 @@ class AIService:
             except Exception as e:
                 print(f"Warning: Could not initialize Firestore client: {e}")
                 self.firestore_client = None
-        
+
         # Initialize fallback AI services
         self.fallback_apis = {
             'google_genai': self._init_google_genai(),
@@ -154,11 +157,11 @@ class AIService:
             'openai_free': self._init_openai_free(),
             'groq': self._init_groq()
         }
-        
+
         print(f"🤖 AI Service initialized. Vertex AI: {'✅' if self.vertex_ai_available else '❌'}")
         available_fallbacks = [name for name, available in self.fallback_apis.items() if available]
         print(f"📡 Available fallback AI services: {available_fallbacks if available_fallbacks else 'None - using static responses'}")
-        
+
         # If no AI services are available, inform user about setup options
         if not self.vertex_ai_available and not any(self.fallback_apis.values()):
             print("\n⚠️  No AI services configured!")
@@ -177,11 +180,11 @@ class AIService:
             if not api_key or api_key == 'your_google_gemini_api_key_here':
                 print("⚠️  Google Generative AI API key not found or not configured in .env file")
                 return False
-            
+
             # Set up for direct REST API calls
             self.google_genai_api_key = api_key
             self.google_genai_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
-            
+
             if GOOGLE_GENAI_AVAILABLE:
                 # Also set up the SDK if available
                 genai_module.configure(api_key=api_key)
@@ -189,12 +192,12 @@ class AIService:
                 print("✅ Google Generative AI (Gemini) initialized successfully with SDK")
             else:
                 print("✅ Google Generative AI (Gemini) initialized for direct REST API calls")
-            
+
             return True
         except Exception as e:
             print(f"Warning: Could not initialize Google Generative AI: {e}")
             return False
-    
+
     def _init_huggingface(self) -> bool:
         """Initialize Hugging Face API (free tier available)"""
         try:
@@ -209,7 +212,7 @@ class AIService:
         except Exception as e:
             print(f"Warning: Could not initialize Hugging Face API: {e}")
             return False
-    
+
     def _init_ollama(self) -> bool:
         """Initialize Ollama (local AI models - completely free)"""
         try:
@@ -222,7 +225,7 @@ class AIService:
         except:
             pass
         return False
-    
+
     def _init_groq(self) -> bool:
         """Initialize Groq API (fast and free)"""
         try:
@@ -231,7 +234,7 @@ class AIService:
             return bool(self.groq_api_key)
         except:
             return False
-    
+
     def _init_openai_free(self) -> bool:
         """Initialize OpenAI-compatible free APIs"""
         try:
@@ -241,10 +244,10 @@ class AIService:
             return bool(self.openai_free_url and self.openai_free_key)
         except:
             return False
-    
+
     def _generate_with_fallback_ai(self, prompt: str) -> str:
         """Try different AI services as fallbacks with enhanced Gemini integration"""
-        
+
         # Try Google Generative AI first (Gemini) - Primary service
         if self.fallback_apis['google_genai']:
             try:
@@ -257,7 +260,7 @@ class AIService:
                         "top_k": 40,
                         "max_output_tokens": 1000,
                     }
-                    
+
                     response = self.genai_model.generate_content(
                         prompt,
                         generation_config=generation_config
@@ -265,7 +268,7 @@ class AIService:
                     if response.text:
                         print("✅ Generated personalized content using Google Generative AI (Gemini SDK)")
                         return response.text
-                
+
                 # Fallback to direct REST API call with enhanced configuration
                 elif hasattr(self, 'google_genai_url'):
                     payload = {
@@ -287,7 +290,7 @@ class AIService:
                                 "threshold": "BLOCK_MEDIUM_AND_ABOVE"
                             },
                             {
-                                "category": "HARM_CATEGORY_HATE_SPEECH", 
+                                "category": "HARM_CATEGORY_HATE_SPEECH",
                                 "threshold": "BLOCK_MEDIUM_AND_ABOVE"
                             },
                             {
@@ -314,10 +317,10 @@ class AIService:
                             return text
                     else:
                         print(f"Gemini API error: {response.status_code} - {response.text}")
-                            
+
             except Exception as e:
                 print(f"Google Generative AI request failed: {e}")
-        
+
         # Try Ollama second (local, completely free)
         if self.fallback_apis['ollama']:
             try:
@@ -337,7 +340,7 @@ class AIService:
                         return result['response']
             except Exception as e:
                 print(f"Ollama request failed: {e}")
-        
+
         # Try Hugging Face API
         if self.fallback_apis['huggingface']:
             try:
@@ -363,7 +366,7 @@ class AIService:
                         return result[0].get('generated_text', '')
             except Exception as e:
                 print(f"Hugging Face request failed: {e}")
-        
+
         # Try Groq API (fast and free)
         if self.fallback_apis['groq']:
             try:
@@ -388,7 +391,7 @@ class AIService:
                         return result['choices'][0]['message']['content']
             except Exception as e:
                 print(f"Groq request failed: {e}")
-        
+
         # Try OpenAI-compatible free API
         if self.fallback_apis['openai_free']:
             try:
@@ -413,11 +416,11 @@ class AIService:
                         return result['choices'][0]['message']['content']
             except Exception as e:
                 print(f"OpenAI-compatible API request failed: {e}")
-        
+
         # If all AI services fail, return empty string (caller handles fallback)
         print("⚠️ All AI services failed, using static fallback")
         return ""
-    
+
     def generate_personalized_roadmap(self, user_skills: str, career_goal: str, experience_level: str) -> str:
         """
         Generate a personalized career roadmap using Gemini AI
@@ -467,12 +470,12 @@ Provide a comprehensive roadmap that includes:
 Make this roadmap actionable, specific, and tailored to their current skill level. Include realistic timelines and practical next steps.
 Make the tone friendly and encouraging, like a helpful mentor guiding a friend through their career journey.
         """
-        
+
         ai_response = self._generate_with_fallback_ai(roadmap_prompt)
-        
+
         if ai_response:
             return ai_response
-        
+
         # Fallback roadmap if AI is unavailable
         return f"""
 🗺️ **Your Personalized Career Roadmap**
@@ -518,66 +521,91 @@ Hey there, future rockstar! 👋 I'm so excited to help guide you on your journe
 
 Remember, every expert was once a beginner. You've got this, and I'm cheering you on every step of the way! 🌈✨
         """
-    
+
     def generate_career_analysis(self, skills: str, expertise: str) -> Dict[str, Any]:
         """Generate career analysis using available AI services with fallbacks"""
-        
+
         prompt = f"""
-        Based on the following skills and expertise, provide a comprehensive career analysis:
+        Create a career analysis for someone with these skills: {skills} and expertise: {expertise}
+        
+        You MUST respond with ONLY valid JSON in this exact format (no markdown, no extra text):
 
-        Skills: {skills}
-        Expertise: {expertise}
-
-        Please provide a JSON response with the following structure:
         {{
             "career_paths": [
                 {{
-                    "title": "Career Path Title",
-                    "description": "Brief description of the career path",
-                    "required_skills": ["skill1", "skill2", "skill3"],
-                    "salary_range": "e.g., ₹49.80 lakhs - ₹99.60 lakhs",
-                    "growth_prospect": "High/Medium/Low with brief explanation"
+                    "title": "Data Scientist",
+                    "description": "Analyze data to drive business decisions", 
+                    "required_skills": ["Python", "Statistics", "Machine Learning"],
+                    "salary_range": "₹15-30 lakhs",
+                    "growth_prospect": "High - Growing demand"
+                }},
+                {{
+                    "title": "ML Engineer", 
+                    "description": "Build machine learning systems",
+                    "required_skills": ["Python", "TensorFlow", "Docker"],
+                    "salary_range": "₹18-35 lakhs", 
+                    "growth_prospect": "Very High - AI boom"
+                }},
+                {{
+                    "title": "Backend Developer",
+                    "description": "Develop server-side applications", 
+                    "required_skills": ["Python", "Django", "PostgreSQL"],
+                    "salary_range": "₹12-25 lakhs",
+                    "growth_prospect": "High - Always in demand"
                 }}
             ],
             "selected_path": {{
-                "title": "Best matching career path",
-                "description": "Detailed description",
-                "required_skills": ["skill1", "skill2", "skill3"],
-                "salary_range": "e.g., ₹49.80 lakhs - ₹99.60 lakhs",
-                "growth_prospect": "High/Medium/Low with brief explanation"
+                "title": "Data Scientist",
+                "description": "Best match for your skills",
+                "required_skills": ["Python", "Statistics", "Machine Learning"], 
+                "salary_range": "₹15-30 lakhs",
+                "growth_prospect": "High - Growing field"
             }},
             "roadmap": [
                 {{
                     "step": 1,
-                    "title": "Step title",
-                    "description": "What to do in this step",
-                    "duration": "e.g., 3-6 months",
-                    "resources": ["resource1", "resource2"]
+                    "title": "Master Python Fundamentals", 
+                    "description": "Strengthen your Python programming skills",
+                    "duration": "2-3 months",
+                    "resources": ["Python Crash Course by Eric Matthes", "Automate the Boring Stuff with Python", "Python.org official tutorial"]
+                }},
+                {{
+                    "step": 2,
+                    "title": "Learn Data Science Libraries",
+                    "description": "Master pandas, numpy, and matplotlib", 
+                    "duration": "2-3 months",
+                    "resources": ["Python for Data Analysis by Wes McKinney", "Pandas documentation", "Kaggle Learn Data Visualization course"]
                 }}
             ],
             "courses": [
                 {{
-                    "title": "Course title",
-                    "provider": "Course provider",
-                    "duration": "e.g., 8 weeks",
-                    "difficulty": "Beginner/Intermediate/Advanced",
-                    "url": "Course URL or platform"
+                    "title": "Complete Python Bootcamp From Zero to Hero",
+                    "provider": "Udemy",
+                    "duration": "22 hours", 
+                    "difficulty": "Beginner",
+                    "url": "https://www.udemy.com/course/complete-python-bootcamp/"
+                }},
+                {{
+                    "title": "Python for Data Science and Machine Learning",
+                    "provider": "Coursera", 
+                    "duration": "6 weeks",
+                    "difficulty": "Intermediate", 
+                    "url": "https://www.coursera.org/learn/python-for-applied-data-science-ai"
                 }}
             ],
             "certifications": [
                 {{
-                    "name": "Certification name",
-                    "provider": "Certification provider",
-                    "description": "Brief description of the certification",
-                    "difficulty": "Beginner/Intermediate/Advanced",
-                    "duration": "e.g., 3 months",
-                    "url": "Certification URL or platform"
+                    "name": "Microsoft Certified: Azure Data Scientist Associate",
+                    "provider": "Microsoft",
+                    "description": "Industry-recognized data science certification",
+                    "difficulty": "Intermediate",
+                    "duration": "3-4 months", 
+                    "url": "https://docs.microsoft.com/en-us/learn/certifications/azure-data-scientist/"
                 }}
             ]
         }}
 
-        Provide exactly 3 career paths, select the best one, create a 5-step roadmap, suggest 3-5 relevant courses, and recommend 3-5 relevant certifications.
-        Focus on practical, actionable advice.
+        Generate realistic recommendations based on the user's skills: {skills} and expertise level: {expertise}
         """
 
         # Try Vertex AI first if available
@@ -585,52 +613,62 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
             try:
                 response = self.model.generate_content(prompt)
                 response_text = response.text
-                
+
                 # Extract JSON from response
                 start_idx = response_text.find('{')
                 end_idx = response_text.rfind('}') + 1
-                
+
                 if start_idx != -1 and end_idx != -1:
                     json_str = response_text[start_idx:end_idx]
                     result = json.loads(json_str)
                     print("✅ Generated career analysis using Vertex AI")
                     return result
-                    
+
             except Exception as e:
                 print(f"Vertex AI generation failed: {e}")
-        
+
         # Try fallback AI services
         ai_response = self._generate_with_fallback_ai(prompt)
         if ai_response:
+            print(f"🔍 AI Response received (length: {len(ai_response)})")
+            print(f"🔍 First 300 chars: {ai_response[:300]}...")
             try:
                 # Try to extract JSON from AI response
                 start_idx = ai_response.find('{')
                 end_idx = ai_response.rfind('}') + 1
-                
+
                 if start_idx != -1 and end_idx != -1:
                     json_str = ai_response[start_idx:end_idx]
+                    print(f"🔍 Extracted JSON (length: {len(json_str)})")
                     # Try to fix common JSON issues
                     try:
                         result = json.loads(json_str)
+                        print("✅ Successfully parsed AI-generated JSON!")
                         return result
                     except json.JSONDecodeError as e:
+                        print(f"❌ JSON parsing error: {e}")
                         # Try to fix common JSON issues
                         fixed_json = self._fix_json_format(json_str)
                         if fixed_json:
                             result = json.loads(fixed_json)
+                            print("✅ Successfully parsed fixed JSON!")
                             return result
                         else:
-                            print(f"Error parsing AI response: {e}")
+                            print(f"❌ Could not fix JSON format")
                             print(f"JSON string: {json_str[:200]}...")  # Print first 200 chars for debugging
+                else:
+                    print("❌ No JSON structure found in AI response")
             except Exception as e:
-                print(f"Error parsing AI response: {e}")
+                print(f"❌ Error parsing AI response: {e}")
                 if 'ai_response' in locals():
                     print(f"Response preview: {ai_response[:200] if ai_response else 'No response'}...")
-        
+        else:
+            print("❌ No AI response received")
+
         # Fallback to static response
         print("📊 Using enhanced static career analysis")
         return self._create_enhanced_fallback_response(skills, expertise)
-    
+
     def _fix_json_format(self, json_str: str) -> str:
         """Attempt to fix common JSON formatting issues"""
         try:
@@ -638,21 +676,21 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
             first_brace = json_str.find('{')
             if first_brace > 0:
                 json_str = json_str[first_brace:]
-            
+
             # Remove any text after the last }
             last_brace = json_str.rfind('}')
             if last_brace > 0 and last_brace < len(json_str) - 1:
                 json_str = json_str[:last_brace + 1]
-            
+
             # Fix common issues
             import re
-            
+
             # Fix trailing commas
             json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
-            
+
             # Try to fix unquoted keys (this is a simple approach)
             json_str = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', json_str)
-            
+
             # Try to fix single quotes around strings
             # This is a simplified approach - a full JSON parser would be better
             parts = json_str.split('"')
@@ -660,17 +698,17 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 # Skip even indices (they're outside quotes)
                 continue
             # For odd indices, they're inside quotes, so we don't modify them
-            
+
             return json_str
         except Exception as e:
             print(f"Error fixing JSON format: {e}")
             return ""
-    
+
     def _create_enhanced_fallback_response(self, skills: str, expertise: str) -> Dict[str, Any]:
         """Create an enhanced fallback response that adapts to user's skills"""
-        
+
         skills_lower = skills.lower()
-        
+
         # Enhanced domain detection with comprehensive skill mapping
         domain_keywords = {
             'software_development': [
@@ -819,14 +857,14 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 'family law', 'divorce', 'custody', 'marriage', 'child support'
             ]
         }
-        
+
         # Determine primary domain based on comprehensive keyword matching
         domain_scores = {}
         for domain, keywords in domain_keywords.items():
             score = sum(1 for keyword in keywords if keyword in skills_lower)
             if score > 0:
                 domain_scores[domain] = score
-        
+
         # Get the domain with highest keyword matches, default to a random domain from all options
         if domain_scores:
             primary_domain = max(domain_scores.keys(), key=lambda k: domain_scores[k])
@@ -834,7 +872,7 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
             # If no matches, randomly select from all domains to ensure variety
             all_domains = list(domain_keywords.keys())
             primary_domain = random.choice(all_domains)
-        
+
         # Enhanced comprehensive domain responses for ALL career fields
         domain_responses = {
             'software_development': {
@@ -1627,7 +1665,7 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 ]
             }
         }
-        
+
         # Get appropriate response or randomly select from available domains to ensure variety
         if primary_domain in domain_responses:
             response_data = domain_responses[primary_domain]
@@ -1636,11 +1674,11 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
             available_domains = list(domain_responses.keys())
             random_domain = random.choice(available_domains)
             response_data = domain_responses[random_domain]
-        
+
         # Randomly select one of the career paths as the selected path to ensure variety
         selected_path_index = random.randint(0, len(response_data['career_paths']) - 1)
         selected_path = response_data['career_paths'][selected_path_index]
-        
+
         # Personalize the roadmap based on expertise level
         expertise_level = expertise.lower()
         if 'beginner' in expertise_level:
@@ -1655,7 +1693,7 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
         else:
             duration_multiplier = 1.0
             difficulty_modifier = 'Intermediate'
-        
+
         # Adjust roadmap steps based on expertise
         personalized_roadmap = [
             {
@@ -1694,7 +1732,7 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 'resources': [f'{skills} interview practice', 'Resume optimization', f'{skills} job boards', 'Referrals']
             }
         ]
-        
+
         # Personalize courses based on skills and expertise
         personalized_courses = [
             {
@@ -1738,7 +1776,7 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 'url': f'https://www.youtube.com/results?search_query={skills.replace(" ", "+")}+certification+preparation'
             }
         ]
-        
+
         # Add some free courses from other platforms
         free_platforms = [
             {
@@ -1766,10 +1804,10 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 'url': f'https://www.freecodecamp.org/learn'
             }
         ]
-        
+
         # Combine YouTube courses with other free courses
         personalized_courses.extend(free_platforms)
-        
+
         # Personalize certifications based on skills
         # Map real certification providers based on user skills
         skill_based_certifications = {
@@ -1956,17 +1994,17 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 }
             ]
         }
-        
+
         # Get certifications based on skills
         certifications_list = []
         skills_lower = skills.lower()
-        
+
         # Check for specific skill matches
         for skill_key, certs in skill_based_certifications.items():
             if skill_key in skills_lower:
                 certifications_list = certs
                 break
-        
+
         # If no specific match found, use generic certifications
         if not certifications_list:
             certifications_list = [
@@ -1995,9 +2033,9 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                     'url': f'https://www.pluralsight.com/search?q={skills.replace(" ", "%20")}'
                 }
             ]
-        
+
         personalized_certifications = certifications_list
-        
+
         return {
             'career_paths': response_data['career_paths'],
             'selected_path': selected_path,
@@ -2008,7 +2046,7 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
 
     def generate_mock_test(self, skills: str, expertise: str, topic: str = "", user_id: str = "") -> Dict[str, Any]:
         """Generate a mock test using available AI services with fallbacks"""
-        
+
         # Build the prompt
         topic_text = f" focusing on {topic}" if topic else ""
         prompt = f"""
@@ -2021,34 +2059,34 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
           {{"question": "...", "answer": "..."}}`,
           {{"question": "...", "answer": "..."}}`
         ]
-        
+
         Make the questions challenging but appropriate for the specified skill level.
         Provide detailed answers that explain the concepts.
         """
 
         questions = None
-        
+
         # Try Vertex AI first if available
         if self.vertex_ai_available and self.model and hasattr(self.model, 'generate_content'):
             try:
                 response = self.model.generate_content(prompt)
                 response_text = response.text
-                
+
                 # Try to find JSON in the response
                 start_idx = response_text.find('[')
                 end_idx = response_text.rfind(']') + 1
-                
+
                 if start_idx != -1 and end_idx != -1:
                     json_str = response_text[start_idx:end_idx]
                     questions_data = json.loads(json_str)
-                    
+
                     # Convert to MockTestQuestion objects
                     questions = [MockTestQuestion(**q) for q in questions_data]
                     print("✅ Generated mock test using Vertex AI")
-                    
+
             except Exception as e:
                 print(f"Vertex AI mock test generation failed: {e}")
-        
+
         # Try fallback AI services if Vertex AI failed
         if not questions:
             ai_response = self._generate_with_fallback_ai(prompt)
@@ -2057,14 +2095,14 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                     # Try to extract JSON from AI response
                     start_idx = ai_response.find('[')
                     end_idx = ai_response.rfind(']') + 1
-                    
+
                     if start_idx != -1 and end_idx != -1:
                         json_str = ai_response[start_idx:end_idx]
                         questions_data = json.loads(json_str)
                         questions = [MockTestQuestion(**q) for q in questions_data]
                 except Exception as e:
                     print(f"Error parsing AI response: {e}")
-        
+
         # If all AI services fail, create a fallback response
         if not questions:
             print("Using static mock test fallback")
@@ -2090,7 +2128,7 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                     answer="Effective career planning involves: 1) Self-assessment of skills, interests, and values, 2) Researching career paths and opportunities, 3) Setting SMART goals (Specific, Measurable, Achievable, Relevant, Time-bound), 4) Creating actionable development plans, 5) Building relevant networks, 6) Regularly reviewing and adjusting plans based on progress and changing circumstances. This structured approach provides direction and motivation."
                 )
             ]
-        
+
         return {
             "questions": questions,
             "generated_at": datetime.now().isoformat()
@@ -2099,34 +2137,34 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
     def extract_skills_from_message(self, message: str, current_skills: str = "") -> Dict[str, Any]:
         """
         Extract skills from a chat message and update the user's skill list.
-        
+
         Args:
             message: The chat message to analyze
             current_skills: The user's current skills list
-            
+
         Returns:
             Dict containing extracted skills and updated skills list
         """
         # Keywords that indicate skill mentions
         skill_indicators = [
-            'learned', 'learning', 'studying', 'know', 'experience', 
+            'learned', 'learning', 'studying', 'know', 'experience',
             'worked with', 'using', 'familiar with', 'proficient in',
             'skilled in', 'expert in', 'mastered', 'practiced'
         ]
-        
+
         # Check if the message contains skill indicators
         if not any(indicator in message.lower() for indicator in skill_indicators):
             return {
                 "extracted_skills": [],
                 "updated_skills": current_skills
             }
-        
+
         # Use AI to extract skills if available
         prompt = f"""
         Extract specific technical skills from this message: "{message}"
-        
+
         Current skills: {current_skills or "None"}
-        
+
         Please provide a JSON response with this structure:
         {{
             "extracted_skills": [
@@ -2136,14 +2174,14 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 }}
             ]
         }}
-        
+
         Only include skills that are explicitly mentioned or strongly implied.
         For expertise level, use:
         - Beginner: Basic knowledge or just started learning
         - Intermediate: Some practical experience
         - Advanced: Strong proficiency or professional experience
         """
-        
+
         # Try to extract skills using AI
         ai_response = self._generate_with_fallback_ai(prompt)
         if ai_response:
@@ -2151,30 +2189,30 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                 # Try to extract JSON from AI response
                 start_idx = ai_response.find('{')
                 end_idx = ai_response.rfind('}') + 1
-                
+
                 if start_idx != -1 and end_idx != -1:
                     json_str = ai_response[start_idx:end_idx]
                     result = json.loads(json_str)
-                    
+
                     if "extracted_skills" in result:
                         # Update skills list
                         current_skills_list = [s.strip() for s in current_skills.split(',')] if current_skills else []
                         new_skills = [skill["skill"] for skill in result["extracted_skills"]]
-                        
+
                         # Add new skills to current skills, avoiding duplicates
                         for skill in new_skills:
                             if skill not in current_skills_list:
                                 current_skills_list.append(skill)
-                        
+
                         updated_skills = ', '.join(current_skills_list) if current_skills_list else ""
-                        
+
                         return {
                             "extracted_skills": result["extracted_skills"],
                             "updated_skills": updated_skills
                         }
             except Exception as e:
                 print(f"Error parsing skill extraction response: {e}")
-        
+
         # Fallback: Simple keyword-based extraction
         # This is a simplified approach - a more sophisticated NLP approach would be better
         common_skills = [
@@ -2187,10 +2225,10 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
             'Figma', 'Photoshop', 'Illustrator', 'Sketch',
             'SEO', 'SEM', 'Google Analytics', 'Social Media Marketing'
         ]
-        
+
         extracted_skills = []
         message_lower = message.lower()
-        
+
         for skill in common_skills:
             if skill.lower() in message_lower:
                 # Determine expertise level based on context
@@ -2200,23 +2238,23 @@ Remember, every expert was once a beginner. You've got this, and I'm cheering yo
                     level = 'Intermediate'
                 else:
                     level = 'Beginner'
-                
+
                 extracted_skills.append({
                     "skill": skill,
                     "expertise_level": level
                 })
-        
+
         # Update skills list
         current_skills_list = [s.strip() for s in current_skills.split(',')] if current_skills else []
         new_skills = [skill["skill"] for skill in extracted_skills]
-        
+
         # Add new skills to current skills, avoiding duplicates
         for skill in new_skills:
             if skill not in current_skills_list:
                 current_skills_list.append(skill)
-        
+
         updated_skills = ', '.join(current_skills_list) if current_skills_list else ""
-        
+
         return {
             "extracted_skills": extracted_skills,
             "updated_skills": updated_skills

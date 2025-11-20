@@ -23,12 +23,12 @@ const Enhanced3DButton = ({
       border: 'border border-blue-600/50'
     },
     secondary: {
-      bg: 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600',
-      hover: 'hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500',
-      active: 'active:from-gray-300 active:to-gray-400 dark:active:from-gray-500 dark:active:to-gray-400',
-      shadow: 'shadow-lg shadow-gray-300/30 dark:shadow-gray-700/50',
-      hoverShadow: 'hover:shadow-xl hover:shadow-gray-300/40 dark:hover:shadow-gray-700/70',
-      border: 'border border-gray-300/50 dark:border-gray-400/70'
+      bg: 'bg-gradient-to-r from-gray-700 to-gray-600',
+      hover: 'hover:from-gray-600 hover:to-gray-500',
+      active: 'active:from-gray-500 active:to-gray-400',
+      shadow: 'shadow-lg shadow-gray-700/50',
+      hoverShadow: 'hover:shadow-xl hover:shadow-gray-700/70',
+      border: 'border border-gray-400/70'
     },
     success: {
       bg: 'bg-gradient-to-r from-green-500 to-emerald-600',
@@ -89,8 +89,7 @@ const Enhanced3DButton = ({
         transform-gpu
         disabled:opacity-50 disabled:cursor-not-allowed
         flex items-center justify-center
-        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-blue-500
-        dark:focus:ring-offset-gray-900
+        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-blue-500
       `}
       whileHover={!disabled && !loading ? { 
         y: -3,

@@ -11,15 +11,15 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     """Get current authenticated user (optional)"""
     if not credentials:
         return None
-    
+
     token_data = auth_service.verify_token(credentials.credentials)
     if token_data is None:
         return None
-    
+
     user = await user_service.get_user_by_email(token_data.email)
     if user is None:
         return None
-    
+
     return User(
         id=user["id"],
         email=user["email"],
@@ -37,18 +37,18 @@ async def get_current_user_required(credentials: HTTPAuthorizationCredentials = 
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     if not credentials:
         raise credentials_exception
-    
+
     token_data = auth_service.verify_token(credentials.credentials)
     if token_data is None:
         raise credentials_exception
-    
+
     user = await user_service.get_user_by_email(token_data.email)
     if user is None:
         raise credentials_exception
-    
+
     return User(
         id=user["id"],
         email=user["email"],

@@ -1,6 +1,5 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useTheme } from '../context/ThemeContext';
 
 const Enhanced3DCard = ({ 
   children, 
@@ -12,8 +11,6 @@ const Enhanced3DCard = ({
   style = {},
   ...props 
 }) => {
-  const { isDark } = useTheme();
-
   return (
     <motion.div
       className={`relative ${className}`}
@@ -63,18 +60,9 @@ const Enhanced3DCard = ({
         }`}
         style={{
           transform: 'translateZ(20px)',
-          ...(isDark ? {
-            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.7) 100%)',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 30px rgba(59, 130, 246, 0.1)'
-          } : {
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(249, 250, 251, 0.7) 100%)',
-            border: '1px solid rgba(203, 213, 225, 0.5)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 30px rgba(96, 165, 250, 0.1)'
-          }),
-          ...(!glowEffect && {
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)'
-          })
+          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.7) 100%)',
+          border: '1px solid rgba(148, 163, 184, 0.2)',
+          boxShadow: glowEffect ? '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 30px rgba(59, 130, 246, 0.1)' : '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)'
         }}
       >
         {floatingEffect ? null : children}

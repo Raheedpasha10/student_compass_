@@ -10,11 +10,11 @@ const initialState = {
     skills: '',
     expertise: 'Beginner'
   },
-  isDarkMode: false,
   analysisResult: null,
   isLoading: false,
   currentSkills: '',
-  currentExpertise: 'Beginner'
+  currentExpertise: 'Beginner',
+  showGlobalFunnelingReport: false
 };
 
 // Action types
@@ -23,7 +23,8 @@ const actionTypes = {
   SET_ANALYSIS_RESULT: 'SET_ANALYSIS_RESULT',
   UPDATE_USER_SKILLS: 'UPDATE_USER_SKILLS',
   SET_CURRENT_SKILLS: 'SET_CURRENT_SKILLS',
-  SET_CURRENT_EXPERTISE: 'SET_CURRENT_EXPERTISE'
+  SET_CURRENT_EXPERTISE: 'SET_CURRENT_EXPERTISE',
+  TOGGLE_FUNNELING_REPORT: 'TOGGLE_FUNNELING_REPORT'
 };
 
 // Reducer
@@ -59,6 +60,11 @@ const appReducer = (state, action) => {
         ...state,
         currentExpertise: action.payload
       };
+    case actionTypes.TOGGLE_FUNNELING_REPORT:
+      return {
+        ...state,
+        showGlobalFunnelingReport: !state.showGlobalFunnelingReport
+      };
     default:
       return state;
   }
@@ -92,13 +98,18 @@ export const AppProvider = ({ children }) => {
     dispatch({ type: actionTypes.SET_CURRENT_EXPERTISE, payload: expertise });
   };
 
+  const toggleFunnelingReport = () => {
+    dispatch({ type: actionTypes.TOGGLE_FUNNELING_REPORT });
+  };
+
   const value = {
     ...state,
     setLoading,
     setAnalysisResult,
     updateUserSkills,
     setCurrentSkills,
-    setCurrentExpertise
+    setCurrentExpertise,
+    toggleFunnelingReport
   };
 
   return (

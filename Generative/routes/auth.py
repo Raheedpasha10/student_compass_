@@ -18,13 +18,13 @@ async def register(user_data: UserCreate):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to create user"
             )
-        
+
         # Create access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = auth_service.create_access_token(
             data={"sub": user.email}, expires_delta=access_token_expires
         )
-        
+
         return Token(
             access_token=access_token,
             token_type="bearer",
@@ -40,23 +40,23 @@ async def register(user_data: UserCreate):
 async def login(user_credentials: UserLogin):
     """Login user"""
     user = await user_service.authenticate_user(
-        user_credentials.email, 
+        user_credentials.email,
         user_credentials.password
     )
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth_service.create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-    
+
     return Token(
         access_token=access_token,
         token_type="bearer",

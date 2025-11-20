@@ -10,14 +10,19 @@ from unittest.mock import Mock, patch
 import os
 import sys
 
-# Add the project root to the Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add the project root (Generative) to the Python path
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from main import app
 from config.settings import settings
 from services.mock_user_service import MockUserService
 
 @pytest.fixture(scope="session")
+
+
 def event_loop():
     """Create an instance of the default event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
@@ -25,6 +30,8 @@ def event_loop():
     loop.close()
 
 @pytest.fixture
+
+
 def client():
     """Create a test client for the FastAPI app."""
     with TestClient(app) as test_client:
@@ -37,11 +44,15 @@ async def async_client():
         yield ac
 
 @pytest.fixture
+
+
 def mock_user_service():
     """Create a mock user service for testing."""
     return MockUserService()
 
 @pytest.fixture
+
+
 def sample_user_data():
     """Sample user data for testing."""
     return {
@@ -53,6 +64,8 @@ def sample_user_data():
     }
 
 @pytest.fixture
+
+
 def sample_skills_data():
     """Sample skills data for testing."""
     return {
@@ -61,11 +74,14 @@ def sample_skills_data():
     }
 
 @pytest.fixture
+
+
 def mock_ai_service():
     """Mock AI service responses."""
-    with patch('services.ai_service.analyze_career_path') as mock_analyze, \
-         patch('services.ai_service.extract_skills_from_message') as mock_extract:
-        
+    # Patch to real function names in AIService
+    with patch('services.ai_service.AIService.generate_career_analysis') as mock_analyze, \
+         patch('services.ai_service.AIService.extract_skills_from_message') as mock_extract:
+
         # Mock career analysis response
         mock_analyze.return_value = {
             "career_paths": [
@@ -111,19 +127,21 @@ def mock_ai_service():
                 }
             ]
         }
-        
+
         # Mock skill extraction response
         mock_extract.return_value = [
             {"skill": "React", "expertise_level": "Intermediate"},
             {"skill": "Node.js", "expertise_level": "Beginner"}
         ]
-        
+
         yield {
             "analyze": mock_analyze,
             "extract": mock_extract
         }
 
 @pytest.fixture
+
+
 def mock_firestore():
     """Mock Firestore database operations."""
     with patch('services.user_service.db') as mock_db:
@@ -143,12 +161,16 @@ def mock_firestore():
         yield mock_db
 
 @pytest.fixture(autouse=True)
+
+
 def reset_mocks():
     """Reset all mocks after each test."""
     yield
     # Any cleanup code can go here
 
 # Mark slow tests
+
+
 def pytest_collection_modifyitems(config, items):
     """Add slow marker to integration tests."""
     for item in items:

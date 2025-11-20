@@ -1,48 +1,233 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
+import { motion } from 'framer-motion';
 import { careerAPI } from '../services/api';
+import LinearButton from '../components/LinearButton';
+import LinearCard from '../components/LinearCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import LoadingScreen from '../components/LoadingScreen';
 
 const Flowchart = () => {
   const [roadmapData, setRoadmapData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [completedSteps, setCompletedSteps] = useState(new Set());
-  const [showCelebration, setShowCelebration] = useState(false); // For completion celebration
+  const [expandedSteps, setExpandedSteps] = useState(new Set());
+  const [visibleSteps, setVisibleSteps] = useState(6); // Show 6 steps initially
   
   const navigate = useNavigate();
   const { currentSkills, currentExpertise } = useAppContext();
-  const { isDark } = useTheme();
 
-  // Fetch roadmap data from your API
+  // Fetch roadmap data using sessionStorage (same as UltimateRoadmap)
   useEffect(() => {
     const fetchRoadmapData = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Check if skills and expertise are available
         if (!currentSkills || !currentExpertise) {
           throw new Error('Skills and expertise are required to generate a roadmap');
         }
         
-        const data = await careerAPI.analyzeCareer(currentSkills, currentExpertise);
-        console.log('Received roadmap data:', data);
+        // Use sessionStorage with flowchart-specific cache version
+        const ROADMAP_CACHE_VERSION = 'v2-structured-1';
+        const flowchartCacheKey = `flowchart_${ROADMAP_CACHE_VERSION}_${currentSkills}_${currentExpertise}`;
+        const roadmapCacheKey = `roadmap_${ROADMAP_CACHE_VERSION}_${currentSkills}_${currentExpertise}`;
         
-        // Validate response data
+        // Check flowchart-specific cache first, then fallback to roadmap cache
+        const cached = sessionStorage.getItem(flowchartCacheKey) || sessionStorage.getItem(roadmapCacheKey);
+        
+        if (cached) {
+          try {
+            const { timestamp, data } = JSON.parse(cached);
+            if (Date.now() - timestamp < 60 * 60 * 1000) {
+              // Check if this is UltimateRoadmap data structure or flowchart data
+              if (data?.roadmap || data?.structured_plan?.phases) {
+                let flowchartData = data;
+                
+                // If this is UltimateRoadmap structured data, convert to flowchart format
+                if (data?.structured_plan?.phases && !Array.isArray(data?.roadmap)) {
+                  console.log('🔄 Converting UltimateRoadmap data to flowchart format...');
+                  const flowchartSteps = [];
+                  
+                  data.structured_plan.phases.forEach((phase, phaseIndex) => {
+                    console.log(`Converting phase ${phaseIndex + 1}:`, phase.name);
+                    
+                    // Add phase as a main step
+                    flowchartSteps.push({
+                      step: flowchartSteps.length + 1,
+                      title: phase.name || `Phase ${phaseIndex + 1}`,
+                      description: (phase.goals && phase.goals.length > 0) ? 
+                        phase.goals.slice(0, 3).join(', ') : 
+                        phase.overview || 'Complete this learning phase',
+                      duration: phase.duration_weeks ? `${phase.duration_weeks} weeks` : '4-6 weeks',
+                      resources: phase.topics?.slice(0, 3) || phase.goals?.slice(0, 3) || []
+                    });
+                    
+                    // Add 1-2 key topics as separate steps
+                    if (phase.topics && phase.topics.length > 0) {
+                      phase.topics.slice(0, 2).forEach((topic) => {
+                        const topicName = typeof topic === 'string' ? topic : topic.name || topic;
+                        if (topicName && topicName.length > 3) {
+                          flowchartSteps.push({
+                            step: flowchartSteps.length + 1,
+                            title: `Learn ${topicName}`,
+                            description: typeof topic === 'object' && topic.description ? 
+                              topic.description : 
+                              `Master ${topicName} fundamentals`,
+                            duration: '1-2 weeks',
+                            resources: [topicName]
+                          });
+                        }
+                      });
+                    }
+                    
+                    // Add 1 major project as a step
+                    if (phase.projects && phase.projects.length > 0) {
+                      const project = phase.projects[0]; // Take first project only
+                      const projectName = typeof project === 'string' ? project : project.name;
+                      if (projectName && projectName.length > 3) {
+                        flowchartSteps.push({
+                          step: flowchartSteps.length + 1,
+                          title: `Build ${projectName}`,
+                          description: typeof project === 'object' && project.description ? 
+                            project.description : 
+                            `Create ${projectName} to demonstrate your skills`,
+                          duration: '2-3 weeks',
+                          resources: phase.tools?.slice(0, 3) || []
+                        });
+                      }
+                    }
+                  });
+                  
+                  console.log('✅ Converted to flowchart steps:', flowchartSteps.length);
+                  flowchartData = {
+                    roadmap: flowchartSteps,
+                    ai_generated: true,
+                    using_multi_agent: true,
+                    career_path: data.selected_path?.title || `${currentSkills} Learning Path`
+                  };
+                }
+                
+                console.log('✅ Using cached flowchart data:', { 
+                  hasRoadmap: !!flowchartData?.roadmap, 
+                  isArray: Array.isArray(flowchartData?.roadmap),
+                  type: typeof flowchartData?.roadmap,
+                  length: flowchartData?.roadmap?.length 
+                });
+                // Ensure roadmap is always an array
+                if (flowchartData && !Array.isArray(flowchartData.roadmap)) {
+                  console.log('⚠️ Converting non-array roadmap to array:', flowchartData.roadmap);
+                  flowchartData.roadmap = [];
+                }
+                setRoadmapData(flowchartData);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (e) {
+            console.log('Cache parse error, generating fresh flowchart');
+          }
+        }
+        
+        // Try to get multi-agent data first, fallback to old system
+        try {
+          console.log('🤖 Generating flowchart with Multi-Agent AI System...');
+          
+          const multiAgentResult = await careerAPI.generateMultiAgentRoadmap(
+            `I want to learn ${currentSkills} step by step`,
+            {
+              current_skills: currentSkills,
+              experience_level: currentExpertise,
+              time_available: '10-15 hours per week',
+              goals: `Create a step-by-step learning path for ${currentSkills}`
+            },
+            false // don't need agent details for flowchart
+          );
+
+          // Convert structured plan to flowchart steps
+          const flowchartSteps = [];
+          
+          if (multiAgentResult?.metadata?.structured_plan?.phases) {
+            multiAgentResult.metadata.structured_plan.phases.forEach((phase, phaseIndex) => {
+              // Add phase as a step
+              flowchartSteps.push({
+                step: flowchartSteps.length + 1,
+                title: phase.name || `Phase ${phaseIndex + 1}`,
+                description: phase.goals?.join(', ') || 'Complete this learning phase',
+                duration: phase.duration_weeks ? `${phase.duration_weeks} weeks` : '4-6 weeks',
+                resources: phase.topics?.slice(0, 3) || []
+              });
+
+              // Add major topics as steps
+              if (phase.projects && phase.projects.length > 0) {
+                phase.projects.slice(0, 2).forEach(project => {
+                  const projectName = typeof project === 'string' ? project : project.name;
+                  if (projectName) {
+                    flowchartSteps.push({
+                      step: flowchartSteps.length + 1,
+                      title: projectName,
+                      description: typeof project === 'object' && project.description ? project.description : `Build ${projectName}`,
+                      duration: '1-2 weeks',
+                      resources: phase.tools?.slice(0, 2) || []
+                    });
+                  }
+                });
+              }
+            });
+          }
+
+          // If we got good structured data, use it
+          if (flowchartSteps.length > 0) {
+            const flowchartData = {
+              roadmap: Array.isArray(flowchartSteps) ? flowchartSteps : [],
+              ai_generated: true,
+              using_multi_agent: true,
+              career_path: `${currentSkills} Learning Path`
+            };
+            console.log('🎯 Setting flowchart data:', { stepCount: flowchartData.roadmap.length });
+            setRoadmapData(flowchartData);
+            setLoading(false);
+            
+            // Save flowchart-specific cache (don't overwrite UltimateRoadmap cache)
+            const flowchartCacheKey = `flowchart_${ROADMAP_CACHE_VERSION}_${currentSkills}_${currentExpertise}`;
+            try { 
+              sessionStorage.setItem(flowchartCacheKey, JSON.stringify({ 
+                timestamp: Date.now(), 
+                data: flowchartData 
+              })); 
+            } catch {}
+            return;
+          }
+        } catch (multiAgentError) {
+          console.warn('⚠️ Multi-agent system failed for flowchart, falling back:', multiAgentError);
+        }
+
+        // Fallback to old system
+        const data = await careerAPI.analyzeCareer(currentSkills, currentExpertise);
+        
         if (!data || !data.roadmap) {
           throw new Error('Invalid response from server. Please try again.');
         }
         
+        // Set data and loading false at the same time
+        // Ensure roadmap is always an array
+        if (data && !Array.isArray(data.roadmap)) {
+          data.roadmap = [];
+        }
+        console.log('📊 Setting fallback data:', { hasRoadmap: !!data?.roadmap, isArray: Array.isArray(data?.roadmap) });
         setRoadmapData(data);
+        setLoading(false);
+        
+        // Save to flowchart-specific cache
+        try { 
+          sessionStorage.setItem(flowchartCacheKey, JSON.stringify({ timestamp: Date.now(), data })); 
+        } catch {}
       } catch (err) {
         console.error('Error fetching roadmap data:', err);
-        // More user-friendly error messages
         if (err.message.includes('Network Error')) {
-          setError('Unable to connect to the server. Please check your internet connection and try again.');
-        } else if (err.message.includes('Server Error')) {
-          setError('Server is currently unavailable. Please try again in a few minutes.');
+          setError('Unable to connect to the server. Please check your internet connection.');
         } else {
           setError(err.message || 'Failed to fetch roadmap data. Please try again.');
         }
@@ -51,71 +236,69 @@ const Flowchart = () => {
       }
     };
 
-    // Only fetch if we have both skills and expertise
     if (currentSkills && currentExpertise) {
       fetchRoadmapData();
     } else {
-      // Set error if skills or expertise are missing
-      setError('Please provide your skills and expertise level on the home page to generate a personalized roadmap.');
+      setError('Please provide your skills and expertise level to generate a personalized roadmap.');
       setLoading(false);
     }
   }, [currentSkills, currentExpertise]);
 
-  // Load completed steps from localStorage when component mounts and when skills change
+  // Load completed steps from localStorage
   useEffect(() => {
     if (currentSkills) {
       const saved = localStorage.getItem(`completedSteps_${currentSkills}`);
       if (saved) {
         try {
-          const parsed = JSON.parse(saved);
-          setCompletedSteps(new Set(parsed));
+          setCompletedSteps(new Set(JSON.parse(saved)));
         } catch (e) {
-          console.error('Error parsing completed steps from localStorage:', e);
           setCompletedSteps(new Set());
         }
-      } else {
-        setCompletedSteps(new Set());
       }
     }
   }, [currentSkills]);
 
-  // Save completed steps to localStorage whenever they change
+  // Save completed steps to localStorage
   useEffect(() => {
     if (currentSkills) {
       localStorage.setItem(`completedSteps_${currentSkills}`, JSON.stringify([...completedSteps]));
     }
   }, [completedSteps, currentSkills]);
 
-  // Check if all steps are completed for celebration
-  useEffect(() => {
-    if (roadmapData && roadmapData.roadmap && completedSteps.size === roadmapData.roadmap.length && roadmapData.roadmap.length > 0) {
-      setShowCelebration(true);
-      // Hide celebration after 5 seconds
-      const timer = setTimeout(() => {
-        setShowCelebration(false);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [completedSteps, roadmapData]);
-
   // Toggle step completion with sequential logic
   const toggleStepCompletion = (stepIndex) => {
     setCompletedSteps(prev => {
       const newSet = new Set(prev);
       
-      // If step is already completed, allow unchecking
       if (newSet.has(stepIndex)) {
         newSet.delete(stepIndex);
         return newSet;
       }
       
-      // Check if previous step is completed (or if it's the first step)
       if (stepIndex === 0 || newSet.has(stepIndex - 1)) {
         newSet.add(stepIndex);
       }
       
       return newSet;
     });
+  };
+
+  // Toggle step expansion
+  const toggleStepExpansion = (stepIndex) => {
+    setExpandedSteps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(stepIndex)) {
+        newSet.delete(stepIndex);
+      } else {
+        newSet.add(stepIndex);
+      }
+      return newSet;
+    });
+  };
+
+  // Show more steps
+  const showMoreSteps = () => {
+    setVisibleSteps(prev => prev + 6);
   };
 
   // Reset progress
@@ -126,364 +309,423 @@ const Flowchart = () => {
     }
   };
 
-  // Add auto-scroll to top when component mounts
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
-  // Get motivational message based on progress
+  // Get progress message
   const getProgressMessage = () => {
-    if (!roadmapData || !roadmapData.roadmap) return '';
+    if (!roadmapData?.roadmap || !Array.isArray(roadmapData.roadmap)) return '';
     
     const totalSteps = roadmapData.roadmap.length;
     const completed = completedSteps.size;
+    const percentage = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
     
-    if (completed === 0) return "Start your journey by completing the first step!";
-    if (completed === 1) return "Great start! Keep going to build momentum.";
-    if (completed === Math.floor(totalSteps / 2)) return "You're halfway there! Keep up the good work.";
-    if (completed === totalSteps - 1) return "Almost there! Complete the final step to finish your journey.";
-    if (completed === totalSteps) return "Congratulations! You've completed your entire learning path!";
-    
-    const percentage = Math.round((completed / totalSteps) * 100);
-    if (percentage < 30) return "Keep going, you're making progress!";
-    if (percentage < 60) return "You're on the right track! Keep pushing forward.";
-    if (percentage < 90) return "You're doing great! Almost at the finish line.";
-    
-    return "You're nearly there! Just a few more steps to go.";
-  };
-
-  // Get achievement badge based on progress
-  const getAchievementBadge = () => {
-    if (!roadmapData || !roadmapData.roadmap) return null;
-    
-    const totalSteps = roadmapData.roadmap.length;
-    const completed = completedSteps.size;
-    
-    if (completed === 0) return null;
-    if (completed === 1) return { icon: 'fas fa-flag-checkered', text: 'First Step', color: 'blue' };
-    if (completed === Math.floor(totalSteps / 4)) return { icon: 'fas fa-medal', text: 'Quarter Way', color: 'green' };
-    if (completed === Math.floor(totalSteps / 2)) return { icon: 'fas fa-trophy', text: 'Halfway Done', color: 'yellow' };
-    if (completed === Math.floor(totalSteps * 0.75)) return { icon: 'fas fa-award', text: 'Three Quarters', color: 'orange' };
-    if (completed === totalSteps) return { icon: 'fas fa-crown', text: 'Completion Master', color: 'purple' };
-    
-    return null;
+    if (completed === 0) return "Start your journey by completing the first step";
+    if (completed === totalSteps) return "Congratulations! You've completed your entire learning path";
+    if (percentage >= 75) return "Almost there! Just a few more steps to go";
+    if (percentage >= 50) return "You're halfway there! Keep going";
+    return "Keep going, you're making progress";
   };
 
   if (loading) {
     return (
-      <div className={`min-h-screen pt-24 professional-background relative overflow-hidden ${isDark ? 'dark' : 'light'}`}>
-        {/* Enhanced Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className={`absolute top-20 left-20 w-64 h-64 rounded-full opacity-20 animate-pulseGlow blur-3xl ${isDark ? 'bg-gradient-to-r from-blue-500/40 to-indigo-500/40' : 'bg-gradient-to-r from-blue-400/30 to-indigo-400/30'} animate-float`}></div>
-          <div className={`absolute bottom-20 right-20 w-48 h-48 rounded-full opacity-15 animate-drift blur-2xl ${isDark ? 'bg-gradient-to-r from-purple-500/40 to-blue-500/40' : 'bg-gradient-to-r from-purple-400/30 to-blue-400/30'}`}></div>
-          
-          {/* Subtle particle effects */}
-          <div className={`absolute top-1/3 left-1/3 w-2 h-2 rounded-full animate-float ${isDark ? 'bg-blue-400' : 'bg-blue-500'}`} style={{animationDuration: '9s', marginLeft: '-1px', marginTop: '-1px'}}></div>
-          <div className={`absolute bottom-1/4 right-1/4 w-1.5 h-1.5 rounded-full animate-drift ${isDark ? 'bg-indigo-400' : 'bg-indigo-500'}`} style={{animationDuration: '11s', marginLeft: '-0.75px', marginTop: '-0.75px'}}></div>
-          <div className={`absolute top-2/3 left-1/5 w-2.5 h-2.5 rounded-full animate-driftDelayed ${isDark ? 'bg-purple-400' : 'bg-purple-500'}`} style={{animationDuration: '13s', marginLeft: '-1.25px', marginTop: '-1.25px'}}></div>
-        </div>
-        
-        <div className="relative z-10 flex items-center justify-center min-h-screen">
-          <div className="text-center p-8 rounded-3xl backdrop-blur-xl border animate-pulse gradient-border">
-            <div className="flex justify-center mb-6">
-              <div className={`w-16 h-16 rounded-full border-4 ${isDark ? 'border-blue-500 border-t-transparent' : 'border-blue-400 border-t-transparent'} animate-spin`}></div>
-            </div>
-            <h2 className={`text-2xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Generating Your Flowchart
-            </h2>
-            <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-              Creating a personalized learning path for <span className="font-semibold">{currentSkills || 'your selected domain'}</span>...
-            </p>
-          </div>
-        </div>
-      </div>
+      <LoadingScreen 
+        title="Crafting Your Learning Flowchart"
+        subtitle="Mapping out your step-by-step learning journey..."
+        steps={[
+          "🔍 Analyzing your current skills",
+          "🎯 Identifying knowledge gaps", 
+          "📝 Creating step-by-step plan",
+          "🔗 Connecting learning modules"
+        ]}
+      />
     );
   }
 
   if (error) {
     return (
-      <div className={`min-h-screen pt-24 professional-background relative overflow-hidden ${isDark ? 'dark' : 'light'}`}>
-        {/* Enhanced Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className={`absolute top-20 left-20 w-64 h-64 rounded-full opacity-20 animate-pulseGlow blur-3xl ${isDark ? 'bg-gradient-to-r from-blue-500/40 to-indigo-500/40' : 'bg-gradient-to-r from-blue-400/30 to-indigo-400/30'} animate-float`}></div>
-          <div className={`absolute bottom-20 right-20 w-48 h-48 rounded-full opacity-15 animate-drift blur-2xl ${isDark ? 'bg-gradient-to-r from-purple-500/40 to-blue-500/40' : 'bg-gradient-to-r from-purple-400/30 to-blue-400/30'}`}></div>
-        </div>
-        
-        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12">
-          <div className="text-center p-10 rounded-3xl backdrop-blur-xl border gradient-border">
-            <div className="mb-6">
-              <i className={`fas fa-exclamation-triangle text-5xl ${isDark ? 'text-yellow-400' : 'text-yellow-500'}`}></i>
-            </div>
-            <h1 className={`text-3xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Error Loading Flowchart
-            </h1>
-            <p className={`text-xl mb-8 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-              {error}
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <button
-                onClick={() => navigate('/')}
-                className="px-6 py-3 rounded-2xl font-bold transition-all duration-300 hover:scale-105 gradient-border"
-              >
-                <i className="fas fa-home mr-2"></i>
-                Go Back Home
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-3 rounded-2xl font-bold transition-all duration-300 hover:scale-105 gradient-border"
-              >
-                <i className="fas fa-sync mr-2"></i>
-                Retry
-              </button>
-            </div>
+      <div className="min-h-screen bg-bg-primary text-text-primary pt-16">
+        <div className="linear-container py-16">
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="text-6xl mb-6">⚠️</div>
+            <h2 className="text-title-3 font-semibold mb-4">Unable to load flowchart</h2>
+            <p className="text-regular text-text-secondary mb-8">{error}</p>
+            <LinearButton variant="primary" onClick={() => navigate('/')}>
+              Go back home
+            </LinearButton>
           </div>
         </div>
       </div>
     );
   }
 
+  const totalSteps = (roadmapData?.roadmap && Array.isArray(roadmapData.roadmap)) ? roadmapData.roadmap.length : 0;
+  const completedCount = completedSteps.size;
+  const progressPercent = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
+
   return (
-    <div className={`min-h-screen pt-24 professional-background relative overflow-hidden ${isDark ? 'dark' : 'light'}`}>
-      {/* Enhanced Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute top-20 left-20 w-64 h-64 rounded-full opacity-20 animate-pulseGlow blur-3xl ${isDark ? 'bg-gradient-to-r from-blue-500/40 to-indigo-500/40' : 'bg-gradient-to-r from-blue-400/30 to-indigo-400/30'} animate-float`}></div>
-        <div className={`absolute bottom-20 right-20 w-48 h-48 rounded-full opacity-15 animate-drift blur-2xl ${isDark ? 'bg-gradient-to-r from-purple-500/40 to-blue-500/40' : 'bg-gradient-to-r from-purple-400/30 to-blue-400/30'}`}></div>
-        
-        {/* Subtle particle effects */}
-        <div className={`absolute top-1/3 left-1/3 w-2 h-2 rounded-full animate-float ${isDark ? 'bg-blue-400' : 'bg-blue-500'}`} style={{animationDuration: '9s', marginLeft: '-1px', marginTop: '-1px'}}></div>
-        <div className={`absolute bottom-1/4 right-1/4 w-1.5 h-1.5 rounded-full animate-drift ${isDark ? 'bg-indigo-400' : 'bg-indigo-500'}`} style={{animationDuration: '11s', marginLeft: '-0.75px', marginTop: '-0.75px'}}></div>
-        <div className={`absolute top-2/3 left-1/5 w-2.5 h-2.5 rounded-full animate-driftDelayed ${isDark ? 'bg-purple-400' : 'bg-purple-500'}`} style={{animationDuration: '13s', marginLeft: '-1.25px', marginTop: '-1.25px'}}></div>
-      </div>
-      
-      {/* Celebration Animation */}
-      {showCelebration && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="text-center animate-bounce">
-            <div className="text-6xl mb-4">🎉</div>
-            <div className={`text-3xl font-bold px-6 py-3 rounded-full backdrop-blur-xl ${isDark ? 'bg-green-900/50 text-green-200' : 'bg-green-100/50 text-green-800'}`}>
-              Congratulations!
+    <div className="min-h-screen bg-bg-primary text-text-primary pt-16">
+      {/* Header with Progress */}
+      <section className="py-12 border-b border-border-primary">
+        <div className="linear-container">
+          <div className="max-w-3xl">
+            <h1 className="text-title-4 font-semibold mb-3" style={{ letterSpacing: '-.022em' }}>
+              {roadmapData?.career_path || currentSkills} Learning Path
+            </h1>
+            <p className="text-regular text-text-secondary mb-6">
+              {getProgressMessage()}
+            </p>
+
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-small text-text-tertiary">
+                  {completedCount} of {totalSteps} completed
+                </span>
+                <span className="text-small font-semibold text-text-secondary">
+                  {progressPercent}%
+                </span>
+              </div>
+              <div 
+                className="h-2 rounded-full overflow-hidden"
+                style={{ background: 'var(--color-bg-tertiary)' }}
+              >
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: 'var(--color-accent)' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPercent}%` }}
+                  transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <LinearButton variant="secondary" size="small" onClick={() => navigate('/simplified-ultimate-roadmap')}>
+                ← View roadmap
+              </LinearButton>
+              {completedCount > 0 && (
+                <LinearButton variant="ghost" size="small" onClick={resetProgress}>
+                  Reset progress
+                </LinearButton>
+              )}
             </div>
           </div>
         </div>
-      )}
-      
-      <div className="relative z-10 max-w-6xl mx-auto px-6 py-12">
-        <div className="text-center mb-12">
-          <h1 className={`text-4xl md:text-5xl font-black mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            Your Learning Flowchart
-          </h1>
-          <p className={`text-xl max-w-3xl mx-auto mb-8 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-            Visual roadmap for <span className="font-bold gradient-text">{currentSkills || 'your selected domain'}</span>
-          </p>
-        </div>
+      </section>
 
-        {roadmapData && (
-          <div className="mb-12">
-            {/* Achievement Badge */}
-            {getAchievementBadge() && (
-              <div className={`mb-6 p-4 rounded-2xl backdrop-blur-xl border text-center animate-pulse ${isDark ? 'bg-gray-800/50 border-gray-700/50' : 'bg-white/50 border-gray-200/50'}`}>
-                <i className={`${getAchievementBadge().icon} text-2xl mr-2 ${
-                  getAchievementBadge().color === 'blue' ? 'text-blue-500' :
-                  getAchievementBadge().color === 'green' ? 'text-green-500' :
-                  getAchievementBadge().color === 'yellow' ? 'text-yellow-500' :
-                  getAchievementBadge().color === 'orange' ? 'text-orange-500' :
-                  getAchievementBadge().color === 'purple' ? 'text-purple-500' : 'text-gray-500'
-                }`}></i>
-                <span className={`font-bold ${
-                  isDark ? 'text-white' : 'text-gray-900'
-                }`}>
-                  Achievement Unlocked: {getAchievementBadge().text}
-                </span>
+      {/* Learning Steps */}
+      <section className="py-12">
+        <div className="linear-container">
+          <div className="max-w-3xl">
+            {/* Debug Info - Remove this later */}
+            {totalSteps === 0 && roadmapData && (
+              <div className="bg-bg-secondary border border-border-primary rounded-8 p-6 mb-6">
+                <h3 className="text-regular font-semibold text-text-primary mb-2">⚠️ Debug: No Flowchart Steps Found</h3>
+                <p className="text-small text-text-secondary mb-3">
+                  Data received but no valid roadmap steps. This usually means the data conversion didn't work.
+                </p>
+                <details className="text-micro text-text-tertiary">
+                  <summary className="cursor-pointer">Show raw data structure</summary>
+                  <pre className="mt-2 p-2 bg-bg-primary rounded-4 overflow-auto">
+                    {JSON.stringify(roadmapData, null, 2)}
+                  </pre>
+                </details>
               </div>
             )}
-            
-            {/* Motivational Message */}
-            <div className={`mb-6 p-4 rounded-2xl backdrop-blur-xl border ${isDark ? 'bg-gray-800/50 border-gray-700/50' : 'bg-white/50 border-gray-200/50'}`}>
-              <p className={`text-center font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                <i className="fas fa-lightbulb mr-2 text-yellow-500"></i>
-                {getProgressMessage()}
-              </p>
-            </div>
-            
-            <div className={`p-8 rounded-3xl backdrop-blur-xl border mb-8 gradient-border ${isDark ? 'border-gray-700/50' : 'border-gray-200/50'}`}>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                <div>
-                  <h2 className={`text-2xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    Learning Path Overview
-                  </h2>
-                  <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                    Follow this structured approach to master your chosen field
-                  </p>
-                </div>
-                <button
-                  onClick={resetProgress}
-                  className={`px-4 py-2 rounded-xl font-bold transition-all duration-300 hover:scale-105 mt-4 md:mt-0 ${isDark ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'}`}
-                >
-                  <i className="fas fa-redo mr-2"></i>
-                  Reset Progress
-                </button>
-              </div>
 
-              {/* Flowchart Visualization */}
-              <div className="relative">
-                {/* Connection lines */}
-                <div className={`absolute left-8 top-0 bottom-0 w-1 bg-gradient-to-b ${isDark ? 'from-blue-500 to-indigo-500' : 'from-blue-400 to-indigo-400'} transform -translate-x-1/2`}></div>
-                
-                <div className="space-y-8 pl-16">
-                  {(roadmapData.roadmap || []).map((step, index) => {
-                    const isCompleted = completedSteps.has(index);
-                    const isUnlocked = index === 0 || completedSteps.has(index - 1);
-                    const isLocked = !isUnlocked && !isCompleted;
+            <div className="space-y-6 relative">
+              {(roadmapData?.roadmap && Array.isArray(roadmapData.roadmap) ? roadmapData.roadmap : [])
+                .slice(0, visibleSteps)
+                .map((step, index) => {
+                const isCompleted = completedSteps.has(index);
+                const isUnlocked = index === 0 || completedSteps.has(index - 1);
+                const isLocked = !isUnlocked;
+                const isExpanded = expandedSteps.has(index);
+                const isLast = index === Math.min(visibleSteps - 1, (roadmapData?.roadmap?.length || 0) - 1);
+
+                return (
+                  <div key={index} className="relative">
+                    {/* Connecting Line */}
+                    {!isLast && (
+                      <div className="absolute left-[23px] top-[48px] bottom-[-24px] w-0.5 z-0" style={{ background: 'var(--color-border-primary)' }}>
+                        <motion.div
+                          className="absolute top-0 left-0 w-full h-full bg-accent"
+                          initial={{ scaleY: 0 }}
+                          animate={{ scaleY: isCompleted ? 1 : 0 }}
+                          transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                          style={{ transformOrigin: 'top' }}
+                        />
+                      </div>
+                    )}
                     
-                    return (
-                      <div key={index} className="relative animate-fadeIn" style={{animationDelay: `${index * 100}ms`}}>
-                        {/* Step connector dot */}
-                        <div className={`absolute left-[-52px] top-6 w-6 h-6 rounded-full flex items-center justify-center transform -translate-x-1/2 ${
-                          isCompleted 
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
-                            : isLocked
-                              ? (isDark ? 'bg-gray-600' : 'bg-gray-400')
-                              : 'bg-gradient-to-r from-blue-500 to-indigo-500'
-                        }`}>
-                          {isCompleted ? (
-                            <i className="fas fa-check text-white text-xs"></i>
-                          ) : isLocked ? (
-                            <i className="fas fa-lock text-white text-xs"></i>
-                          ) : (
-                            <span className="text-white font-bold text-xs">{index + 1}</span>
-                          )}
-                        </div>
-                        
-                        {/* Step card */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03, duration: 0.3 }}
+                      className="relative z-10"
+                    >
+                      <LinearCard 
+                        className={`p-0 ${isUnlocked ? '' : 'opacity-50'} relative overflow-hidden bg-bg-secondary border border-border-primary`}
+                      >
                         <div 
-                          className={`p-6 rounded-2xl backdrop-blur-xl border transition-all duration-300 hover:scale-[1.02] gradient-border tilt-effect ${
-                            isCompleted 
-                              ? (isDark 
-                                  ? 'border-green-500/30' 
-                                  : 'border-green-200/50')
-                              : isLocked
-                                ? (isDark 
-                                    ? 'border-gray-700/30 opacity-60 cursor-not-allowed' 
-                                    : 'border-gray-200/30 opacity-70 cursor-not-allowed')
-                                : (isDark 
-                                    ? 'border-gray-700/50 cursor-pointer' 
-                                    : 'border-gray-200/50 cursor-pointer')
-                          }`}
-                          onClick={() => {
-                            if (!isLocked) {
-                              toggleStepCompletion(index);
-                            }
-                          }}
+                          className="p-6 cursor-pointer hover:bg-bg-tertiary transition-colors"
+                          onClick={() => isUnlocked && toggleStepCompletion(index)}
                         >
-                          <div className="flex justify-between items-start mb-4">
-                            <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                              {step.title}
-                              {isLocked && (
-                                <span className={`ml-2 text-sm px-2 py-1 rounded-full ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
-                                  <i className="fas fa-lock mr-1"></i>
-                                  Locked
-                                </span>
-                              )}
+                          <div className="flex items-start gap-4">
+                          {/* Step Number/Checkbox */}
+                          <div className="flex-shrink-0 mt-1 relative z-10">
+                          <motion.button
+                            className={`
+                              w-6 h-6 rounded-full flex items-center justify-center
+                              border-2 transition-regular
+                            `}
+                            style={{
+                              borderColor: isCompleted ? 'var(--color-accent)' : 'var(--color-border-tertiary)',
+                              background: isCompleted ? 'var(--color-accent)' : 'transparent',
+                            }}
+                            whileHover={isUnlocked ? { scale: 1.1 } : {}}
+                            whileTap={isUnlocked ? { scale: 0.95 } : {}}
+                            disabled={isLocked}
+                          >
+                            {isCompleted ? (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                                <path d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : isLocked ? (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-quaternary">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                              </svg>
+                            ) : (
+                              <span className="text-micro font-semibold text-text-tertiary">
+                                {index + 1}
+                              </span>
+                            )}
+                          </motion.button>
+                          </div>
+
+                        {/* Step Content */}
+                        <div className="flex-grow">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 
+                              className={`
+                                text-regular font-semibold
+                                ${isCompleted ? 'text-text-tertiary line-through' : 'text-text-primary'}
+                                ${isLocked ? 'text-text-quaternary' : ''}
+                              `}
+                            >
+                              {step.title || step.step || `Step ${index + 1}`}
                             </h3>
-                            <div className={`px-3 py-1 rounded-full text-sm font-bold ${isDark ? 'bg-blue-900/50 text-blue-200' : 'bg-blue-100/50 text-blue-700'}`}>
+                            {isCompleted && (
+                              <span 
+                                className="text-micro font-medium px-2 py-0.5 rounded-6"
+                                style={{ 
+                                  background: 'rgba(113, 112, 255, 0.15)',
+                                  color: 'var(--color-accent-hover)',
+                                }}
+                              >
+                                Done
+                              </span>
+                            )}
+                          </div>
+
+                          {step.description && (
+                            <p 
+                              className={`
+                                text-small mb-3
+                                ${isCompleted ? 'text-text-quaternary' : 'text-text-tertiary'}
+                              `}
+                            >
+                              {step.description}
+                            </p>
+                          )}
+
+                          {step.resources && step.resources.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {step.resources.map((resource, i) => (
+                                <span 
+                                  key={i}
+                                  className="text-micro px-2 py-1 rounded-6"
+                                  style={{ 
+                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    color: 'var(--color-text-tertiary)'
+                                  }}
+                                >
+                                  {resource}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {step.duration && (
+                            <div className="flex items-center gap-1.5 text-micro text-text-quaternary mt-2">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                              </svg>
                               {step.duration}
                             </div>
-                          </div>
-                          
-                          <p className={`mb-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                            {step.description}
-                          </p>
-                          
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {(step.resources || []).slice(0, 3).map((resource, resourceIndex) => (
-                              <span 
-                                key={resourceIndex}
-                                className={`px-3 py-1 rounded-full text-xs font-bold ${isDark ? 'bg-blue-900/40 text-blue-200' : 'bg-blue-100/50 text-blue-700'}`}
+                          )}
+
+                          {/* Expansion Button */}
+                          <div className="flex items-center gap-2 mt-3">
+                            <button
+                              className="text-micro text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleStepExpansion(index);
+                              }}
+                            >
+                              <span>{isExpanded ? 'Show Less' : 'Show More'}</span>
+                              <motion.svg 
+                                width="12" 
+                                height="12" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                strokeWidth="2"
+                                animate={{ rotate: isExpanded ? 180 : 0 }}
+                                transition={{ duration: 0.2 }}
                               >
-                                {resource}
-                              </span>
-                            ))}
-                            {(step.resources || []).length > 3 && (
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
-                                +{(step.resources || []).length - 3} more
-                              </span>
-                            )}
-                          </div>
-                          
-                          <div className="flex justify-between items-center">
-                            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {isLocked 
-                                ? `Complete step ${index} to unlock` 
-                                : `Click to mark as ${isCompleted ? 'incomplete' : 'complete'}`}
-                            </span>
-                            {isCompleted && (
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${isDark ? 'bg-green-900/50 text-green-200' : 'bg-green-100/50 text-green-800'}`}>
-                                <i className="fas fa-check mr-1"></i>
-                                Completed
-                              </span>
-                            )}
+                                <polyline points="6 9 12 15 18 9"/>
+                              </motion.svg>
+                            </button>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                        </div>
+                        </div>
+
+                        {/* Expanded Details */}
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                            className="border-t border-border-primary bg-bg-primary p-6"
+                          >
+                            <div className="space-y-3">
+                              <h4 className="text-small font-semibold text-text-primary mb-2">
+                                Step Details
+                              </h4>
+                              
+                              {step.description && (
+                                <div>
+                                  <h5 className="text-micro font-medium text-text-secondary mb-1">Description:</h5>
+                                  <p className="text-small text-text-tertiary">{step.description}</p>
+                                </div>
+                              )}
+
+                              {step.duration && (
+                                <div>
+                                  <h5 className="text-micro font-medium text-text-secondary mb-1">Duration:</h5>
+                                  <p className="text-small text-text-tertiary">{step.duration}</p>
+                                </div>
+                              )}
+
+                              {step.resources && step.resources.length > 0 && (
+                                <div>
+                                  <h5 className="text-micro font-medium text-text-secondary mb-2">Key Topics:</h5>
+                                  <div className="flex flex-wrap gap-1">
+                                    {step.resources.map((resource, i) => (
+                                      <span 
+                                        key={i}
+                                        className="text-micro px-2 py-1 rounded-4 bg-bg-secondary text-text-tertiary border border-border-secondary"
+                                      >
+                                        {resource}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div>
+                                <h5 className="text-micro font-medium text-text-secondary mb-1">Status:</h5>
+                                <span className={`text-micro px-2 py-1 rounded-4 ${
+                                  isCompleted ? 'bg-green-500/20 text-green-400' :
+                                  isLocked ? 'bg-gray-500/20 text-gray-400' :
+                                  'bg-blue-500/20 text-blue-400'
+                                }`}>
+                                  {isCompleted ? 'Completed' : isLocked ? 'Locked' : 'Available'}
+                                </span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </LinearCard>
+                    </motion.div>
+                  </div>
+                );
+              })}
+
+              {/* Show More Button */}
+              {roadmapData?.roadmap && visibleSteps < roadmapData.roadmap.length && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center pt-6"
+                >
+                  <LinearButton 
+                    variant="secondary" 
+                    onClick={showMoreSteps}
+                    className="flex items-center gap-2"
+                  >
+                    <span>Show More Steps</span>
+                    <span className="text-micro bg-bg-tertiary px-2 py-0.5 rounded-4">
+                      +{roadmapData.roadmap.length - visibleSteps}
+                    </span>
+                  </LinearButton>
+                </motion.div>
+              )}
             </div>
 
-            {/* Progress Summary */}
-            <div className={`p-6 rounded-2xl backdrop-blur-xl border gradient-border ${isDark ? 'border-gray-700/50' : 'border-gray-200/50'}`}>
-              <h3 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                Progress Summary
-              </h3>
-              <div className="flex items-center">
-                <div className="flex-1 mr-4">
-                  <div className={`w-full h-3 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                    <div 
-                      className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500"
-                      style={{ width: `${roadmapData.roadmap && roadmapData.roadmap.length > 0 ? (completedSteps.size / roadmapData.roadmap.length) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  {completedSteps.size} of {roadmapData.roadmap ? roadmapData.roadmap.length : 0} steps completed
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Fallback content if roadmapData is not available */}
-        {!roadmapData && !loading && !error && (
-          <div className="text-center p-10 rounded-3xl backdrop-blur-xl border gradient-border">
-            <div className="mb-6">
-              <i className={`fas fa-info-circle text-5xl ${isDark ? 'text-blue-400' : 'text-blue-500'}`}></i>
-            </div>
-            <h1 className={`text-3xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              No Roadmap Data Available
-            </h1>
-            <p className={`text-xl mb-8 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-              We couldn't generate a roadmap for your selected skills. Please try again or select different skills.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <button
-                onClick={() => navigate('/')}
-                className="px-6 py-3 rounded-2xl font-bold transition-all duration-300 hover:scale-105 gradient-border"
+            {/* Completion Message */}
+            {completedCount === totalSteps && totalSteps > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="mt-12 text-center"
               >
-                <i className="fas fa-home mr-2"></i>
-                Select Skills
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-3 rounded-2xl font-bold transition-all duration-300 hover:scale-105 gradient-border"
-              >
-                <i className="fas fa-sync mr-2"></i>
-                Retry
-              </button>
-            </div>
+                <motion.div 
+                  className="mb-6"
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.5, type: "spring", stiffness: 200, damping: 15 }}
+                >
+                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto text-accent-hover">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                </motion.div>
+                <motion.h2 
+                  className="text-title-3 font-semibold mb-3"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  Congratulations!
+                </motion.h2>
+                <motion.p 
+                  className="text-regular text-text-secondary mb-8"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                >
+                  You've completed your entire learning path for {currentSkills}
+                </motion.p>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.9 }}
+                >
+                  <LinearButton variant="primary" size="large" onClick={() => navigate('/')}>
+                    Explore more careers
+                  </LinearButton>
+                </motion.div>
+              </motion.div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </section>
     </div>
   );
 };

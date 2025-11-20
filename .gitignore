@@ -98,3 +98,13 @@ test_google_genai.py
 # Temporary files
 *.tmp
 *.temp
+# Environment files
+**/.env
+*/.env
+.env
+Generative/.env
+
+# Environment files with API keys
+Generative/.env
+**/.env
+.env

@@ -2,10 +2,13 @@ from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from datetime import datetime
 
+
 class AnalyzeRequest(BaseModel):
     """Request model for career analysis"""
-    skills: str
-    expertise: str
+    # Make fields optional to allow route-level validation (prevents 422 for empty payloads)
+    skills: Optional[str] = ""
+    expertise: Optional[str] = ""
+
 
 class Certification(BaseModel):
     """Certification recommendation"""
@@ -13,8 +16,9 @@ class Certification(BaseModel):
     provider: str
     description: str
     difficulty: str
-    duration: str
+    duration: Optional[str] = "Varies"
     url: str
+
 
 class CareerPath(BaseModel):
     """Career path information"""
@@ -24,14 +28,16 @@ class CareerPath(BaseModel):
     salary_range: str
     growth_prospect: str
 
+
 class Course(BaseModel):
     """Course recommendation"""
     title: str
     provider: str
-    duration: str
+    duration: Optional[str] = "Self-paced"
     difficulty: str
     url: str
     type: Optional[str] = None
+
 
 class RoadmapStep(BaseModel):
     """Roadmap step information"""
@@ -41,6 +47,7 @@ class RoadmapStep(BaseModel):
     duration: str
     resources: List[str]
 
+
 class AnalyzeResponse(BaseModel):
     """Complete analysis response"""
     career_paths: List[CareerPath]
@@ -49,14 +56,17 @@ class AnalyzeResponse(BaseModel):
     courses: List[Course]
     certifications: List[Certification]
 
+
 class HealthResponse(BaseModel):
     """Health check response"""
     status: str
     service: str
 
+
 class RootResponse(BaseModel):
     """Root endpoint response"""
     message: str
+
 
 class MockTestRequest(BaseModel):
     """Request model for mock test generation"""
@@ -64,10 +74,12 @@ class MockTestRequest(BaseModel):
     expertise: str
     topic: Optional[str] = None
 
+
 class MockTestQuestion(BaseModel):
     """Mock test question model"""
     question: str
     answer: str
+
 
 class MockTestResponse(BaseModel):
     """Mock test response model"""
@@ -77,6 +89,8 @@ class MockTestResponse(BaseModel):
     created_at: str
 
 # User Authentication Models
+
+
 class UserCreate(BaseModel):
     """User creation request"""
     email: EmailStr
@@ -85,16 +99,19 @@ class UserCreate(BaseModel):
     skills: Optional[str] = None
     expertise: Optional[str] = None
 
+
 class UserLogin(BaseModel):
     """User login request"""
     email: EmailStr
     password: str
+
 
 class UserUpdate(BaseModel):
     """User update request"""
     full_name: Optional[str] = None
     skills: Optional[str] = None
     expertise: Optional[str] = None
+
 
 class User(BaseModel):
     """User response model"""
@@ -106,20 +123,24 @@ class User(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class Token(BaseModel):
     """JWT token response"""
     access_token: str
     token_type: str
     user: User
 
+
 class TokenData(BaseModel):
     """Token data for validation"""
     email: Optional[str] = None
+
 
 class ChatMessage(BaseModel):
     """Chat message model"""
     message: str
     user_id: Optional[str] = None
+
 
 class ChatResponse(BaseModel):
     """Chat response model"""
@@ -128,15 +149,18 @@ class ChatResponse(BaseModel):
     updated_skills: str
     user: Optional[User] = None
 
+
 class UpdateSkillsRequest(BaseModel):
     """Update skills request model"""
     user_id: str
     message: str
 
+
 class SkillExtraction(BaseModel):
     """Individual skill extraction model"""
     skill: str
     expertise_level: str
+
 
 class UpdateSkillsResponse(BaseModel):
     """Update skills response model"""

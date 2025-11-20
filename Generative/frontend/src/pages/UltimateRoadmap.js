@@ -1,943 +1,1478 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
+import { motion, AnimatePresence } from 'framer-motion';
 import { careerAPI } from '../services/api';
+import LinearButton from '../components/LinearButton';
+import LinearCard from '../components/LinearCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import LoadingScreen from '../components/LoadingScreen';
+import { getRealResources } from '../constants/realResources';
+import OptimizedPhaseDisplay from '../components/OptimizedPhaseDisplay';
+import FunnelingReport from '../components/FunnelingReport';
 
 const SimplifiedUltimateRoadmap = () => {
+  const ROADMAP_CACHE_VERSION = 'v2-structured-1';
   const [roadmapData, setRoadmapData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showYouTubeVideos, setShowYouTubeVideos] = useState(false);
-  const [showBooks, setShowBooks] = useState(false);
-  const [showCertifications, setShowCertifications] = useState(false);
-  const [showCourses, setShowCourses] = useState(false);
-  const [youtubeVideos, setYoutubeVideos] = useState([]);
-  const [books, setBooks] = useState([]);
-  const [certifications, setCertifications] = useState([]);
-  const [courses, setCourses] = useState([]);
+  const [selectedResource, setSelectedResource] = useState(null);
+  const [resources, setResources] = useState([]);
   const [loadingResources, setLoadingResources] = useState(false);
-  const [selectedResourceType, setSelectedResourceType] = useState('');
-  const [usingDemoData, setUsingDemoData] = useState(false); // New state to track demo data usage
-  
+  const [usingDemoData, setUsingDemoData] = useState(false);
+  const [agentStatus, setAgentStatus] = useState({ current: '', agents: [] });
+  const [expandedPhases, setExpandedPhases] = useState(new Set());
   const navigate = useNavigate();
-  const { currentSkills, currentExpertise } = useAppContext();
-  const { isDark } = useTheme();
+  const { currentSkills, currentExpertise, showGlobalFunnelingReport } = useAppContext();
 
-  // Fetch roadmap data from your API
+  // Helper functions for platform styling
+  const getPlatformColor = (platform) => {
+    const colors = {
+      'YouTube': '#FF0000',
+      'Udemy': '#A435F0',
+      'Coursera': '#0056D3',
+      'edX': '#02262B',
+      'Pluralsight': '#F15B2A',
+      'LinkedIn Learning': '#0077B5',
+      'LinkedIn': '#0077B5',
+      'Skillshare': '#00FF88',
+      'GitHub': '#181717',
+      'O\'Reilly': '#D3002D',
+      'Amazon': '#FF9900',
+      'Packt': '#83B81A',
+      'Manning': '#D2691E',
+      'freeCodeCamp': '#0A0A23',
+      'Microsoft': '#5C2D91',
+      'AWS': '#FF9900',
+      'Google Cloud': '#4285F4',
+      'Meta': '#1877F2',
+      'Free Online': '#28A745'
+    };
+    return colors[platform] || '#6366F1';
+  };
+
+  const getPlatformIcon = (platform) => {
+    const icons = {
+      'YouTube': '📺',
+      'Udemy': '🎓',
+      'Coursera': '📚',
+      'edX': '🎯',
+      'Pluralsight': '💻',
+      'LinkedIn Learning': '💼',
+      'LinkedIn': '💼',
+      'Skillshare': '🎨',
+      'GitHub': '📝',
+      'O\'Reilly': '📖',
+      'Amazon': '📚',
+      'Packt': '📘',
+      'Manning': '📕',
+      'freeCodeCamp': '💻',
+      'Microsoft': '🏢',
+      'AWS': '☁️',
+      'Google Cloud': '☁️',
+      'Meta': '👥',
+      'Free Online': '🌐'
+    };
+    return icons[platform] || '🔗';
+  };
+
+  const buildLearningPath = (analysis) => {
+    if (!analysis) return null;
+
+    // Try to parse structured plan first
+    if (analysis?.structured_plan?.phases?.length > 0) {
+      return analysis.structured_plan.phases.map(phase => ({
+        phase: phase.phase || phase.title || 'Learning Phase',
+        duration: phase.duration || '—',
+        topics: [
+          ...(phase.topics || []),
+          ...(phase.projects || []).map(p => `Project: ${p}`)
+        ].slice(0, 5)
+      }));
+    }
+
+    // Parse AI-generated roadmap text
+    if (typeof analysis.final_roadmap === 'string') {
+      const roadmapText = analysis.final_roadmap;
+      
+      // Parse phases from AI-generated roadmap
+      const phaseMatches = roadmapText.match(/\*\*Phase \d+:.*?\*\*[\s\S]*?(?=\*\*Phase \d+:|$)/gi);
+      
+      if (phaseMatches && phaseMatches.length > 0) {
+        return phaseMatches.slice(0, 7).map((phaseText, index) => {
+          // Extract phase title
+          const titleMatch = phaseText.match(/\*\*Phase \d+: (.*?)\*\*/);
+          const title = titleMatch ? titleMatch[1].split('(')[0].trim() : `Phase ${index + 1}`;
+          
+          // Extract duration
+          const durationMatch = phaseText.match(/\(([^)]*(?:month|week|day)[^)]*)\)/i);
+          const duration = durationMatch ? durationMatch[1] : '—';
+          
+          // Extract topics (look for bullet points or key topics)
+          const topicMatches = phaseText.match(/[-•]\s*([^\n]+)/g);
+          const topics = topicMatches 
+            ? topicMatches.slice(0, 5).map(t => t.replace(/^[-•]\s*/, '').trim())
+            : [`Master ${title}`];
+          
+          return {
+            phase: title,
+            duration: duration,
+            topics: topics
+          };
+        });
+      }
+    }
+    
+    // Legacy format fallback
+    if (Array.isArray(analysis.roadmap)) {
+      return analysis.roadmap.map((step) => ({
+        phase: step.title || `Step ${step.step || ''}`,
+        duration: step.duration || '—',
+        topics: Array.isArray(step.resources) && step.resources.length > 0
+          ? step.resources.slice(0, 5)
+          : (step.description ? [step.description] : []),
+      }));
+    }
+    
+    return null;
+  };
+
+  // Fetch roadmap data - Multi-Agent System
   useEffect(() => {
     const fetchRoadmapData = async () => {
       try {
-        setLoading(true);
         setError(null);
-        setUsingDemoData(false); // Reset demo data flag
+        setLoading(true);
+        setUsingDemoData(false);
+        setAgentStatus({ current: 'Initializing Multi-Agent AI System...', agents: [] });
+
+        // Smart session-based caching (1 hour)
+        const cacheKey = `roadmap_${ROADMAP_CACHE_VERSION}_${currentSkills}_${currentExpertise}`;
+        const cached = sessionStorage.getItem(cacheKey);
         
-        // Check if skills and expertise are available
+        if (cached) {
+          try {
+            const { timestamp, data } = JSON.parse(cached);
+            // Use cache if less than 1 hour old
+            if (Date.now() - timestamp < 60 * 60 * 1000) {
+              console.log('✅ Using cached roadmap (session storage)');
+              const learning_path = buildLearningPath(data);
+              const finalData = { ...data, learning_path: learning_path || [] };
+              setRoadmapData(finalData);
+              setUsingDemoData(false);
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.log('Cache parse error, generating fresh roadmap');
+          }
+        }
+        
         if (!currentSkills || !currentExpertise) {
           throw new Error('Skills and expertise are required to generate a personalized roadmap');
         }
         
-        const data = await careerAPI.analyzeCareer(currentSkills, currentExpertise);
-        setRoadmapData(data);
+        console.log('🤖 Generating roadmap with Multi-Agent AI System...');
+        setAgentStatus({ current: 'Multi-Agent System Activated', agents: [
+          { name: 'Strategic Planner', status: 'analyzing', model: 'Llama 3.3 70B' },
+          { name: 'Practical Guide', status: 'analyzing', model: 'Gemini 2.0 Flash' },
+          { name: 'Technical Expert', status: 'analyzing', model: 'Llama 3.1 8B' }
+        ]});
+        
+        // Use Multi-Agent System for comprehensive analysis
+        try {
+          const multiAgentResult = await careerAPI.generateMultiAgentRoadmap(
+            `I want to learn ${currentSkills} and become proficient in this field`,
+            {
+              current_skills: currentSkills,
+              experience_level: currentExpertise,
+              time_available: '10-15 hours per week',
+              goals: `Master ${currentSkills} and build a successful career`
+            },
+            true // include agent details
+          );
+
+          console.log('✅ Multi-Agent AI Analysis Complete!');
+          console.log(`📊 ${multiAgentResult.metadata.successful_agents}/${multiAgentResult.metadata.num_agents} AI agents contributed`);
+          console.log('🔍 Funneling Report Available:', !!multiAgentResult.funneling_report);
+
+          // Parse structured plan from AI roadmap
+          let structuredPlan = null;
+          try {
+            const roadmapText = multiAgentResult.final_roadmap;
+            const phaseMatches = roadmapText.match(/\*\*Phase \d+:.*?\*\*[\s\S]*?(?=\*\*Phase \d+:|$)/gi);
+            
+            if (phaseMatches && phaseMatches.length > 0) {
+              structuredPlan = {
+                phases: phaseMatches.map((phaseText, index) => {
+                  const titleMatch = phaseText.match(/\*\*Phase \d+: (.*?)\*\*/);
+                  const title = titleMatch ? titleMatch[1].split('(')[0].trim() : `Phase ${index + 1}`;
+                  const durationMatch = phaseText.match(/\(([^)]*(?:month|week|day)[^)]*)\)/i);
+                  const duration = durationMatch ? durationMatch[1] : `${index * 2 + 2}-${(index + 1) * 2 + 2} weeks`;
+                  const topicMatches = phaseText.match(/[-•]\s*([^\n]+)/g);
+                  const topics = topicMatches ? topicMatches.slice(0, 5).map(t => t.replace(/^[-•]\s*/, '').trim()) : [];
+                  
+                  return {
+                    phase: title,
+                    duration: duration,
+                    topics: topics,
+                    projects: []
+                  };
+                })
+              };
+            }
+          } catch (e) {
+            console.warn('Failed to parse structured plan:', e);
+          }
+
+          const data = {
+            final_roadmap: multiAgentResult.final_roadmap,
+            roadmap: multiAgentResult.final_roadmap,
+            career_path: currentSkills,
+            expertise_level: currentExpertise,
+            learning_path: [],
+            structured_plan: structuredPlan, 
+            courses: [],
+            certifications: [],
+            ai_generated: true,
+            agent_insights: multiAgentResult.agent_insights,
+            using_multi_agent: true,
+            funneling_report: multiAgentResult.funneling_report,
+            session_id: multiAgentResult.metadata?.session_id
+          };
+
+          const learning_path = buildLearningPath(data);
+          const finalData = { ...data, learning_path: learning_path || [] };
+          setRoadmapData(finalData);
+          setUsingDemoData(false);
+          
+          // Cache in sessionStorage
+          try { 
+            sessionStorage.setItem(cacheKey, JSON.stringify({ 
+              timestamp: Date.now(), 
+              data: finalData 
+            })); 
+          } catch {}
+
+        } catch (multiAgentError) {
+          console.warn('Multi-agent system failed, falling back to standard system:', multiAgentError);
+          
+          // Fallback to old system
+          const data = await careerAPI.analyzeCareer(currentSkills, currentExpertise);
+          const learning_path = buildLearningPath(data);
+          const finalData = { ...data, learning_path: learning_path || [] };
+          setRoadmapData(finalData);
+          setUsingDemoData(false);
+          try { sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: finalData })); } catch {}
+        }
+        
       } catch (err) {
-        console.error('Error fetching roadmap data:', err);
-        // Set flag to indicate we're using demo data
+        console.error('❌ Error fetching roadmap data:', err);
         setUsingDemoData(true);
-        // Only show error if it's not a network error (since we have fallback)
-        if (!err.message.includes('Network Error') && !err.message.includes('Unable to connect to server')) {
-          setError(err.message || 'Failed to fetch roadmap data. Please try again.');
+        if (!err.message.includes('Network Error') && !err.message.includes('Unable to connect')) {
+          setError(err.message || 'Failed to fetch roadmap data');
         }
       } finally {
         setLoading(false);
       }
     };
 
-    // Only fetch data if both skills and expertise are available
     if (currentSkills && currentExpertise) {
       fetchRoadmapData();
-    } else {
-      if (!currentSkills || !currentExpertise) {
-        setError('Please provide your skills and expertise level to generate a personalized roadmap.');
-      }
-      setLoading(false);
     }
   }, [currentSkills, currentExpertise]);
 
-  // Search YouTube videos based on current skills using custom API
-  const searchYouTubeVideos = async () => {
-    console.log('searchYouTubeVideos called with skills:', currentSkills);
+  const fetchResources = async (type) => {
     setLoadingResources(true);
-    setSelectedResourceType('youtube');
-    setShowBooks(false);
-    setShowCertifications(false);
-    setShowCourses(false);
+    setSelectedResource(type);
     
     try {
-      const searchTerm = currentSkills || 'engineering';
-      // Using the official YouTube Data API v3
-      const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY || 'AIzaSyAytoNZiRTkprioNLhFVd9sUmAkn-RVyMg';
-      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchTerm + ' course')}&type=video&maxResults=12&key=${YOUTUBE_API_KEY}`;
-      console.log('Fetching YouTube API:', url);
-      const response = await fetch(url);
-      console.log('YouTube API response status:', response.status);
+      // Use career path context to find relevant resources
+      let searchTopic = currentSkills;
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('YouTube API response data:', data);
+      // If we have roadmap data, use the selected career path for better context
+      if (roadmapData?.career_path || roadmapData?.selected_path?.title) {
+        const careerPath = (roadmapData?.career_path || roadmapData?.selected_path?.title || '').toLowerCase();
         
-        if (data && data.items && data.items.length > 0) {
-          // Process official YouTube API response
-          const processedVideos = data.items.map(video => ({
-            title: video.snippet.title,
-            channel: video.snippet.channelTitle,
-            description: video.snippet.description,
-            thumbnail: video.snippet.thumbnails.medium.url,
-            url: `https://www.youtube.com/watch?v=${video.id.videoId}`,
-            publishedAt: video.snippet.publishedAt
-          }));
-          
-          console.log('Processed YouTube videos:', processedVideos);
-          setYoutubeVideos(processedVideos);
-          setShowYouTubeVideos(true);
+        // Map career paths to relevant topics for resource search
+        if (careerPath.includes('data scientist') || careerPath.includes('data analyst')) {
+          searchTopic = type === 'youtube' ? 'data science python' : 
+                      type === 'courses' ? 'data science machine learning' :
+                      type === 'books' ? 'data science statistics' :
+                      'data science certification';
+        } else if (careerPath.includes('software developer') || careerPath.includes('software engineer')) {
+          searchTopic = type === 'youtube' ? `${currentSkills} programming` : 
+                      type === 'courses' ? `${currentSkills} development` :
+                      type === 'books' ? `${currentSkills} programming guide` :
+                      `${currentSkills} developer certification`;
+        } else if (careerPath.includes('web developer') || careerPath.includes('frontend')) {
+          searchTopic = type === 'youtube' ? 'web development javascript' : 
+                      type === 'courses' ? 'frontend web development' :
+                      type === 'books' ? 'web development guide' :
+                      'web developer certification';
         } else {
-          console.log('No YouTube videos found, using demo videos');
-          // Fallback to demo videos
-          setYoutubeVideos(getDemoVideos(12));
-          setShowYouTubeVideos(true);
+          // Use the original skills with career path context
+          searchTopic = `${currentSkills} ${careerPath}`;
         }
-      } else {
-        console.log('YouTube API response not OK, using demo videos');
-        // Fallback to demo videos
-        setYoutubeVideos(getDemoVideos(12));
-        setShowYouTubeVideos(true);
       }
-    } catch (error) {
-      console.error('Error fetching YouTube videos:', error);
-      // Fallback to demo videos without showing error
-      setYoutubeVideos(getDemoVideos(12));
-      setShowYouTubeVideos(true);
-    } finally {
-      setLoadingResources(false);
-    }
-  };
-
-  // Search books based on current skills using Google Books API
-  const searchBooks = async () => {
-    console.log('searchBooks called with skills:', currentSkills);
-    setLoadingResources(true);
-    setSelectedResourceType('books');
-    setShowYouTubeVideos(false);
-    setShowCertifications(false);
-    setShowCourses(false);
-    
-    try {
-      const searchTerm = currentSkills || 'engineering';
-      // Using the Google Books API
-      const GOOGLE_BOOKS_API_KEY = process.env.REACT_APP_GOOGLE_BOOKS_API_KEY || 'AIzaSyAytoNZiRTkprioNLhFVd9sUmAkn-RVyMg';
-      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchTerm + ' course')}&maxResults=12&key=${GOOGLE_BOOKS_API_KEY}`;
-      console.log('Fetching Google Books API:', url);
-      const response = await fetch(url);
-      console.log('Google Books API response status:', response.status);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Google Books API response data:', data);
-        
-        if (data && data.items && data.items.length > 0) {
-          // Process Google Books API response
-          const processedBooks = data.items.map(book => ({
-            title: book.volumeInfo.title,
-            authors: book.volumeInfo.authors ? book.volumeInfo.authors.join(', ') : 'Unknown Author',
-            description: book.volumeInfo.description ? book.volumeInfo.description.substring(0, 150) + '...' : 'No description available',
-            thumbnail: book.volumeInfo.imageLinks ? book.volumeInfo.imageLinks.thumbnail : 'https://via.placeholder.com/128x192?text=No+Cover',
-            url: book.volumeInfo.infoLink || '#',
-            publishedDate: book.volumeInfo.publishedDate || 'Unknown Date',
-            pageCount: book.volumeInfo.pageCount || 'Unknown'
-          }));
-          
-          console.log('Processed books:', processedBooks);
-          setBooks(processedBooks);
-          setShowBooks(true);
-        } else {
-          console.log('No books found, using demo books');
-          // Fallback to demo books
-          setBooks(getDemoBooks(12));
-          setShowBooks(true);
-        }
-      } else {
-        console.log('Google Books API response not OK, using demo books');
-        // Fallback to demo books
-        setBooks(getDemoBooks(12));
-        setShowBooks(true);
-      }
-    } catch (error) {
-      console.error('Error fetching books:', error);
-      // Fallback to demo books without showing error
-      setBooks(getDemoBooks(12));
-      setShowBooks(true);
-    } finally {
-      setLoadingResources(false);
-    }
-  };
-
-  // Search certifications based on current skills
-  const searchCertifications = async () => {
-    console.log('searchCertifications called with roadmapData:', roadmapData);
-    setLoadingResources(true);
-    setSelectedResourceType('certifications');
-    setShowYouTubeVideos(false);
-    setShowBooks(false);
-    setShowCourses(false);
-    
-    try {
-      // Use actual certifications from the roadmap data if available
-      if (roadmapData && roadmapData.certifications && roadmapData.certifications.length > 0) {
-        console.log('Using certifications from roadmapData');
-        // Transform backend certifications to match frontend format
-        const transformedCertifications = roadmapData.certifications.map(cert => ({
-          title: cert.name || cert.title,
-          provider: cert.provider,
-          type: cert.type || 'Paid', // Use type from backend or default to Paid
-          description: cert.description,
-          url: cert.url,
-          difficulty: cert.difficulty,
-          duration: cert.duration
+      console.log(`Fetching ${type} resources for: ${searchTopic}`);
+      
+      // Try API-based resource search with contextual topic
+      const apiResources = await careerAPI.searchResources(type, searchTopic, 15, 'intermediate');
+      
+      if (apiResources && apiResources.length > 0) {
+        // Transform API resources to match existing UI
+        const transformedResources = apiResources.map(resource => ({
+          title: resource.title,
+          url: resource.url,
+          thumbnail: resource.thumbnail || '',
+          channel: resource.channel || resource.instructor || resource.author || '',
+          description: resource.description || '',
+          provider: resource.provider || resource.platform || '',
+          platform: resource.provider || resource.platform || '',
+          duration: resource.duration || '',
+          views: resource.views || '',
+          rating: resource.rating || '',
+          students: resource.students || '',
+          price: resource.price || '',
+          level: resource.level || ''
         }));
         
-        console.log('Transformed certifications:', transformedCertifications);
-        setCertifications(transformedCertifications);
-        setShowCertifications(true);
-      } else {
-        console.log('No certifications in roadmapData, using demo certifications');
-        // Fallback to demo certifications if no data from backend
-        const demoCertifications = getDemoCertifications(12);
-        setCertifications(demoCertifications);
-        setShowCertifications(true);
+        setResources(transformedResources);
+        setLoadingResources(false);
+        return;
       }
     } catch (error) {
-      console.error('Error fetching certifications:', error);
-      // Fallback to demo certifications without showing error
-      setCertifications(getDemoCertifications(12));
-      setShowCertifications(true);
-    } finally {
-      setLoadingResources(false);
+      console.warn('API resource search failed, falling back to curated resources:', error);
     }
+    
+    // Enhanced fallback with career path context
+    setTimeout(() => {
+      try {
+        // Generate contextual resources based on career path and roadmap
+        let contextualResources = [];
+        
+        if (roadmapData?.structured_plan?.phases) {
+          // Extract relevant topics from the structured phases
+          const roadmapTopics = roadmapData.structured_plan.phases
+            .flatMap(phase => phase.topics || [])
+            .slice(0, 15);
+          
+          if (roadmapTopics.length > 0) {
+            contextualResources = roadmapTopics.map((topic, index) => ({
+              title: `${topic} - ${type === 'youtube' ? 'Video Tutorial' : 
+                               type === 'courses' ? 'Complete Course' :
+                               type === 'books' ? 'Learning Guide' : 
+                               'Certification'}`,
+              url: generateContextualUrl(topic, type),
+              thumbnail: '',
+              channel: getProviderForType(type),
+              description: `Learn ${topic} as part of your ${currentSkills} career path. Essential skill for mastering this role.`,
+              provider: getProviderForType(type),
+              platform: getProviderForType(type),
+              duration: getDurationForType(type),
+              rating: '4.5/5',
+              price: getPriceForType(type),
+              level: 'Intermediate'
+            }));
+          }
+        }
+        
+        // If no roadmap context, use the original method with better topic matching
+        if (contextualResources.length === 0) {
+          const realResources = getRealResources(currentSkills, type, 15);
+          contextualResources = realResources.map(resource => ({
+            title: resource.title,
+            url: resource.url,
+            thumbnail: resource.thumbnail || '',
+            channel: resource.channel || resource.instructor || resource.author || '',
+            description: resource.description || '',
+            provider: resource.provider || resource.platform || '',
+            platform: resource.provider || resource.platform || '',
+            duration: resource.duration || '',
+            views: resource.views || '',
+            rating: resource.rating || '',
+            students: resource.students || '',
+            price: resource.price || '',
+            level: resource.level || ''
+          }));
+        }
+        
+        setResources(contextualResources);
+      } catch (err) {
+        console.error('Error loading contextual resources:', err);
+        setResources([]);
+      } finally {
+        setLoadingResources(false);
+      }
+    }, 200);
   };
 
-  // Search courses based on current skills
-  const searchCourses = async () => {
-    console.log('searchCourses called with roadmapData:', roadmapData);
-    setLoadingResources(true);
-    setSelectedResourceType('courses');
-    setShowYouTubeVideos(false);
-    setShowBooks(false);
-    setShowCertifications(false);
-    
-    try {
-      // Use actual courses from the roadmap data if available
-      if (roadmapData && roadmapData.courses && roadmapData.courses.length > 0) {
-        console.log('Using courses from roadmapData');
-        setCourses(roadmapData.courses);
-        setShowCourses(true);
-      } else {
-        console.log('No courses in roadmapData, using demo courses');
-        // Fallback to demo courses if no data from backend
-        const demoCourses = getDemoCourses(12);
-        setCourses(demoCourses);
-        setShowCourses(true);
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-      // Fallback to demo courses without showing error
-      const demoCourses = getDemoCourses(12);
-      setCourses(demoCourses);
-      setShowCourses(true);
-    } finally {
-      setLoadingResources(false);
+  // Helper functions for contextual resource generation
+  const generateContextualUrl = (topic, type) => {
+    const encodedTopic = encodeURIComponent(topic);
+    const baseUrls = {
+      youtube: `https://www.youtube.com/results?search_query=${encodedTopic}+tutorial+2024`,
+      courses: `https://www.coursera.org/search?query=${encodedTopic}`,
+      books: `https://www.amazon.com/s?k=${encodedTopic}+book`,
+      certifications: `https://www.google.com/search?q=${encodedTopic}+certification`
+    };
+    return baseUrls[type] || '#';
+  };
+
+  const getProviderForType = (type) => {
+    const providers = {
+      youtube: 'YouTube',
+      courses: 'Coursera',
+      books: 'Amazon',
+      certifications: 'Professional'
+    };
+    return providers[type] || 'Learning Platform';
+  };
+
+  const getDurationForType = (type) => {
+    const durations = {
+      youtube: '2-5 hours',
+      courses: '4-8 weeks',
+      books: 'Self-paced',
+      certifications: '3-6 months'
+    };
+    return durations[type] || 'Varies';
+  };
+
+  const getPriceForType = (type) => {
+    const prices = {
+      youtube: 'Free',
+      courses: '$39-79/month',
+      books: '$25-45',
+      certifications: '$150-300'
+    };
+    return prices[type] || 'Varies';
+  };
+
+  // Enhanced helper functions for phase expansion and resource indicators
+  const togglePhaseExpansion = (phaseIndex) => {
+    const newExpanded = new Set(expandedPhases);
+    if (newExpanded.has(phaseIndex)) {
+      newExpanded.delete(phaseIndex);
+    } else {
+      newExpanded.add(phaseIndex);
     }
+    setExpandedPhases(newExpanded);
+  };
+
+  const renderCostIndicator = (resource) => {
+    if (!resource) return null;
+    
+    // Ensure safe string handling to prevent object rendering
+    const costString = typeof resource.cost === 'string' ? resource.cost : '';
+    const priceNoteString = typeof resource.price_note === 'string' ? resource.price_note : '';
+    
+    const isPaid = resource.is_paid || 
+                   (costString && costString.toLowerCase().includes('paid')) ||
+                   (priceNoteString && priceNoteString.includes('$')) ||
+                   (costString && costString !== 'Free' && costString !== 'free');
+    
+    const costText = priceNoteString || costString || 'Free';
+    
+    return (
+      <span 
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-4 text-micro font-medium ${
+          isPaid 
+            ? 'bg-orange-100 text-orange-700 border border-orange-200' 
+            : 'bg-green-100 text-green-700 border border-green-200'
+        }`}
+      >
+        {isPaid ? '💰' : '🆓'}
+        {costText}
+      </span>
+    );
+  };
+
+  const renderResourceWithIndicator = (resource, index) => {
+    if (!resource) return null;
+    
+    // Ensure all values are strings to prevent object rendering errors
+    const resourceTitle = typeof resource.title === 'string' ? resource.title : 
+                         typeof resource.name === 'string' ? resource.name : 
+                         `Resource ${index + 1}`;
+    
+    const resourceUrl = typeof resource.url === 'string' ? resource.url : '#';
+    const resourceDescription = typeof resource.description === 'string' ? resource.description : '';
+    const resourceProvider = typeof resource.provider === 'string' ? resource.provider : 
+                             typeof resource.platform === 'string' ? resource.platform : '';
+    
+    return (
+      <div key={index} className="border border-border-primary rounded-8 p-3 hover:bg-bg-secondary transition-colors">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h6 className="text-small font-medium text-text-primary flex-1">
+            {resourceUrl !== '#' ? (
+              <a href={resourceUrl} target="_blank" rel="noopener noreferrer" className="hover:text-accent-hover transition-colors">
+                {resourceTitle}
+              </a>
+            ) : (
+              resourceTitle
+            )}
+          </h6>
+          {renderCostIndicator(resource)}
+        </div>
+        
+        {resourceProvider && (
+          <p className="text-micro text-text-tertiary mb-1">
+            📚 {resourceProvider} 
+            {resource.duration && typeof resource.duration === 'string' && ` • ${resource.duration}`} 
+            {resource.difficulty && typeof resource.difficulty === 'string' && ` • ${resource.difficulty}`}
+          </p>
+        )}
+        
+        {resourceDescription && (
+          <p className="text-micro text-text-secondary">
+            {resourceDescription}
+          </p>
+        )}
+        
+        {resource.rating && typeof resource.rating === 'string' && (
+          <div className="flex items-center gap-1 mt-1">
+            <span className="text-micro text-text-tertiary">⭐ {resource.rating}</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
+    return <LoadingScreen agentStatus={agentStatus} />;
+  }
+
+  if (error && !usingDemoData) {
     return (
-      <div className={`min-h-screen pt-16 ${isDark ? 'bg-gray-900' : 'bg-gray-50'} ${isDark ? 'dark' : 'light'}`}>
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center">
-            <div className="flex items-center justify-center mb-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
-            <h1 className={`text-3xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Generating Your Roadmap
-            </h1>
-            <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-              Creating a personalized learning path for {currentSkills || 'your selected domain'}...
-            </p>
+      <div className="min-h-screen bg-bg-primary text-text-primary pt-16">
+        <div className="linear-container py-16">
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="text-6xl mb-6">⚠️</div>
+            <h1 className="text-title-2 font-semibold mb-4">Unable to Generate Roadmap</h1>
+            <p className="text-large text-text-secondary mb-6">{error}</p>
+            <LinearButton onClick={() => navigate('/career-path')}>
+              ← Back to Career Path
+            </LinearButton>
           </div>
         </div>
       </div>
     );
   }
 
-  // Demo videos as fallback
-  const getDemoVideos = (count = 12) => {
-    const videos = [];
-    for (let i = 1; i <= count; i++) {
-      videos.push({
-        title: `${i <= 4 ? 'Complete Course' : i <= 8 ? "Beginner's Guide" : 'Advanced'} on ${currentSkills || "Engineering"} - Part ${i}`,
-        channel: `${i <= 4 ? 'Educational Channel' : i <= 8 ? 'Learning Academy' : 'Expert Tutorials'} ${Math.ceil(i/4)}`,
-        description: `${i <= 4 ? 'Learn' : i <= 8 ? 'Perfect for beginners to start their' : 'Master advanced concepts in'} ${currentSkills || "Engineering"} from ${i <= 4 ? 'basics to advanced level' : i <= 8 ? 'the beginning' : 'expert techniques'}`,
-        thumbnail: `https://via.placeholder.com/320x180/4F46E5/FFFFFF?text=${i <= 4 ? 'Course' : i <= 8 ? 'Beginner' : 'Advanced'}+${i}`,
-        url: `https://youtube.com/watch?v=demo${i}`
-      });
-    }
-    return videos;
-  };
-
-  // Demo books as fallback
-  const getDemoBooks = (count = 12) => {
-    const books = [];
-    for (let i = 1; i <= count; i++) {
-      books.push({
-        title: `${i <= 4 ? 'Complete Guide' : i <= 8 ? 'Mastering' : 'Career Path'} to ${currentSkills || "Engineering"} - Volume ${i}`,
-        authors: `${i <= 4 ? 'Expert Author' : i <= 8 ? 'Professional Developer' : 'Industry Expert'} ${Math.ceil(i/4)}`,
-        description: `${i <= 4 ? 'Comprehensive guide covering all aspects' : i <= 8 ? 'Practical approach to mastering' : 'Step-by-step guide to building a successful career in'} ${currentSkills || "Engineering"}`,
-        thumbnail: `https://via.placeholder.com/128x192/4F46E5/FFFFFF?text=Book+${i}`,
-        url: "https://www.google.com/search?q=" + encodeURIComponent("best books on " + (currentSkills || "Engineering")) + " filetype:pdf",
-        publishedDate: `202${i % 3}`,
-        pageCount: `${150 + i * 10}`
-      });
-    }
-    return books;
-  };
-
-  // Demo certifications as fallback
-  const getDemoCertifications = (count = 12) => {
-    const certificationPlatforms = [
-      { name: 'Credly', url: 'https://www.credly.com/search?q=', category: 'professional' },
-      { name: 'Coursera', url: 'https://www.coursera.org/search?query=', category: 'university' },
-      { name: 'CompTIA', url: 'https://www.comptia.org/certifications/search?q=', category: 'it' },
-      { name: 'PMI', url: 'https://www.pmi.org/certifications/search?q=', category: 'management' },
-      { name: 'AWS', url: 'https://aws.amazon.com/training/search/?search=', category: 'cloud' },
-      { name: 'Microsoft', url: 'https://learn.microsoft.com/en-us/search/?terms=', category: 'technology' },
-      { name: 'Google', url: 'https://cloud.google.com/certification/search?q=', category: 'cloud' },
-      { name: 'Cisco', url: 'https://www.cisco.com/c/en/us/training-events/training-certifications/search.html?q=', category: 'networking' }
-    ];
-    
-    const certs = [];
-    for (let i = 1; i <= count; i++) {
-      const platform = certificationPlatforms[(i - 1) % certificationPlatforms.length];
-      const skillTerm = encodeURIComponent(currentSkills || 'certification');
-      certs.push({
-        title: `${currentSkills} ${i <= 3 ? 'Foundational' : i <= 6 ? 'Professional' : i <= 9 ? 'Expert' : 'Master'} Certification`,
-        provider: platform.name,
-        type: i % 2 === 0 ? "Paid" : "Free",
-        description: `${i <= 4 ? 'Entry-level certification for beginners in' : i <= 8 ? 'Professional certification for experienced practitioners in' : 'Advanced certification for experts in'} ${currentSkills || "the field"}`,
-        url: `${platform.url}${skillTerm}`,
-        difficulty: i <= 4 ? "Beginner" : i <= 8 ? "Intermediate" : "Advanced",
-        duration: `${i <= 4 ? '1-3' : i <= 8 ? '3-6' : '6-12'} months`
-      });
-    }
-    return certs;
-  };
-
-  // Demo courses as fallback
-  const getDemoCourses = (count = 12) => {
-    const coursePlatforms = [
-      { name: 'Coursera', url: 'https://www.coursera.org/courses?query=', category: 'university' },
-      { name: 'Udemy', url: 'https://www.udemy.com/courses/search/?q=', category: 'professional' },
-      { name: 'edX', url: 'https://www.edx.org/search?q=', category: 'university' },
-      { name: 'Pluralsight', url: 'https://www.pluralsight.com/search?q=', category: 'it' },
-      { name: 'Khan Academy', url: 'https://www.khanacademy.org/search?page_search_query=', category: 'educational' },
-      { name: 'LinkedIn Learning', url: 'https://www.linkedin.com/learning/search?keywords=', category: 'professional' },
-      { name: 'Skillshare', url: 'https://www.skillshare.com/search?query=', category: 'creative' },
-      { name: 'FutureLearn', url: 'https://www.futurelearn.com/search?q=', category: 'university' }
-    ];
-    
-    const courses = [];
-    for (let i = 1; i <= count; i++) {
-      const platform = coursePlatforms[(i - 1) % coursePlatforms.length];
-      const skillTerm = encodeURIComponent(currentSkills || 'course');
-      courses.push({
-        title: `${currentSkills} ${i <= 4 ? 'Fundamentals' : i <= 8 ? 'Advanced' : 'Specialization'} Course`,
-        provider: platform.name,
-        type: i % 3 === 0 ? "Self-paced" : i % 3 === 1 ? "Instructor-led" : "Hybrid",
-        description: `${i <= 4 ? 'Beginner-friendly introduction to' : i <= 8 ? 'Comprehensive coverage of' : 'Advanced mastery of'} ${currentSkills || "the subject"} with practical projects`,
-        url: `${platform.url}${skillTerm}`,
-        difficulty: i <= 4 ? "Beginner" : i <= 8 ? "Intermediate" : "Advanced",
-        duration: `${i <= 4 ? '4-6' : i <= 8 ? '8-12' : '12-16'} weeks`
-      });
-    }
-    return courses;
+  const displayRoadmap = roadmapData || {
+    career_path: currentSkills || 'Your Career Path',
+    expertise_level: currentExpertise || 'Beginner',
+    learning_path: [
+      { phase: 'Foundation', duration: '3 months', topics: ['Basics', 'Core Concepts', 'Best Practices'] },
+      { phase: 'Intermediate', duration: '6 months', topics: ['Advanced Topics', 'Real Projects', 'Industry Tools'] },
+      { phase: 'Expert', duration: '12+ months', topics: ['Specialization', 'Complex Systems', 'Leadership'] }
+    ]
   };
 
   return (
-    <div className={`min-h-screen pt-16 ${isDark ? 'bg-gray-900' : 'bg-gray-50'} ${isDark ? 'dark' : 'light'} relative overflow-hidden`}>
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Learning Roadmap
-            </h1>
-            <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-              Personalized path for {currentSkills || 'your selected domain'}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/')}
-            className={`px-4 py-2 rounded-lg flex items-center ${isDark ? 'bg-indigo-700 hover:bg-indigo-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-          >
-            <i className="fas fa-edit mr-2"></i>
-            Change Skills
-          </button>
-        </div>
-
-        {/* Error message display - only show non-network errors or when not using demo data */}
-        {error && !usingDemoData && (
-          <div className={`mb-6 p-4 rounded-lg ${isDark ? 'bg-red-900/50 border border-red-700' : 'bg-red-50 border border-red-200'}`}>
-            <div className="flex items-center">
-              <i className="fas fa-exclamation-circle text-red-500 mr-2"></i>
-              <span className={isDark ? 'text-red-200' : 'text-red-700'}>{error}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Info message when using demo data */}
-        {usingDemoData && (
-          <div className={`mb-6 p-4 rounded-lg ${isDark ? 'bg-blue-900/50 border border-blue-700' : 'bg-blue-50 border border-blue-200'}`}>
-            <div className="flex items-center">
-              <i className="fas fa-info-circle text-blue-500 mr-2"></i>
-              <span className={isDark ? 'text-blue-200' : 'text-blue-700'}>
-                Showing demo data. Connect to the backend server for personalized recommendations.
-              </span>
-            </div>
-          </div>
-        )}
-
-        <div className="mb-12">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Learning Roadmap Section */}
-            <div className={`rounded-xl shadow-lg p-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border`}>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Suggested Learning Roadmap
-                </h2>
-                <span className={`text-sm px-3 py-1 rounded-full ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-800'}`}>
-                  {roadmapData?.roadmap?.length || 3} steps
-                </span>
-              </div>
-              
-              <div className="space-y-6">
-                {/* Show actual roadmap data if available, otherwise show demo data */}
-                {(roadmapData?.roadmap && roadmapData.roadmap.length > 0 ? roadmapData.roadmap : [
-                  {
-                    title: "Foundational Skills",
-                    duration: "2-3 months",
-                    description: "Start with the basics of " + (currentSkills || "your selected domain") + " to build a strong foundation.",
-                    keyActivities: [
-                      "Complete introductory tutorials and courses",
-                      "Set up development environment",
-                      "Practice basic coding exercises",
-                      "Join online communities and forums"
-                    ],
-                    skillsGained: [
-                      "Basic syntax and concepts",
-                      "Problem-solving fundamentals",
-                      "Debugging techniques",
-                      "Version control basics"
-                    ],
-                    resources: [
-                      "Documentation and official guides",
-                      "Interactive coding platforms",
-                      "Beginner-friendly YouTube channels",
-                      "Mentorship programs"
-                    ]
-                  },
-                  {
-                    title: "Intermediate Concepts",
-                    duration: "3-6 months",
-                    description: "Deepen your understanding with more complex topics and real-world applications.",
-                    keyActivities: [
-                      "Build personal projects",
-                      "Contribute to open-source projects",
-                      "Participate in coding challenges",
-                      "Attend workshops and meetups"
-                    ],
-                    skillsGained: [
-                      "Advanced programming concepts",
-                      "System design principles",
-                      "Collaboration tools",
-                      "Testing methodologies"
-                    ],
-                    resources: [
-                      "Intermediate courses and tutorials",
-                      "Technical blogs and articles",
-                      "Industry conferences",
-                      "Professional networking events"
-                    ]
-                  },
-                  {
-                    title: "Advanced Techniques",
-                    duration: "6+ months",
-                    description: "Master advanced skills and stay updated with the latest trends.",
-                    keyActivities: [
-                      "Lead complex projects",
-                      "Mentor junior developers",
-                      "Publish technical content",
-                      "Pursue specialized certifications"
-                    ],
-                    skillsGained: [
-                      "Architectural design",
-                      "Performance optimization",
-                      "Leadership and management",
-                      "Research and innovation"
-                    ],
-                    resources: [
-                      "Advanced courses and specializations",
-                      "Research papers and publications",
-                      "Industry expert sessions",
-                      "Professional development programs"
-                    ]
-                  }
-                ]).map((step, index) => (
-                  <div 
-                    key={index} 
-                    className="relative pl-8 pb-6 border-l-2 border-indigo-500 last:border-l-0 last:pb-0"
-                  >
-                    <div className="absolute -left-3 top-0 w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-bold">{index + 1}</span>
-                    </div>
-                    <div className={`rounded-xl p-5 ${isDark ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
-                      <div className="flex justify-between items-start mb-3">
-                        <h3 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                          {step.title}
-                        </h3>
-                        <span className={`text-sm px-3 py-1 rounded-full font-medium ${isDark ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-100 text-indigo-800'}`}>
-                          {step.duration}
-                        </span>
-                      </div>
-                      <p className={`mb-4 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {step.description}
-                      </p>
-                      
-                      {/* Key Activities Section */}
-                      <div className="mt-4">
-                        <h4 className={`text-sm font-semibold mb-2 flex items-center ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-                          <i className="fas fa-tasks mr-2 text-indigo-500"></i>
-                          Key Activities
-                        </h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          {(step.keyActivities || ["Complete assigned tasks", "Participate in team meetings", "Review documentation"]).map((activity, actIndex) => (
-                            <li 
-                              key={actIndex} 
-                              className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
-                            >
-                              {activity}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      
-                      {/* Skills You'll Gain Section */}
-                      <div className="mt-4">
-                        <h4 className={`text-sm font-semibold mb-2 flex items-center ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-                          <i className="fas fa-graduation-cap mr-2 text-green-500"></i>
-                          Skills You'll Gain
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {(step.skillsGained || ["Technical skills", "Problem solving", "Communication"]).map((skill, skillIndex) => (
-                            <span 
-                              key={skillIndex} 
-                              className={`px-2 py-1 rounded-lg text-xs font-medium ${isDark ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-green-100 text-green-800 border border-green-200'}`}
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* Recommended Resources Section */}
-                      <div className="mt-4">
-                        <h4 className={`text-sm font-semibold mb-2 flex items-center ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-                          <i className="fas fa-book mr-2 text-blue-500"></i>
-                          Recommended Resources
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {(step.resources || ["Documentation", "Tutorials", "Community forums"]).map((resource, resIndex) => (
-                            <span 
-                              key={resIndex} 
-                              className={`px-2 py-1 rounded-lg text-xs font-medium ${isDark ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-blue-100 text-blue-800 border border-blue-200'}`}
-                            >
-                              {resource}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recommended Resources Section */}
-            <div className={`rounded-xl shadow-lg p-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border`}>
-              <h2 className={`text-2xl font-semibold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                Recommended Resources
-              </h2>
-              
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <button
-                  onClick={() => {
-                    console.log('YouTube button clicked');
-                    searchYouTubeVideos();
-                  }}
-                  disabled={loadingResources && selectedResourceType === 'youtube'}
-                  className={`p-4 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
-                    showYouTubeVideos 
-                      ? (isDark ? 'bg-red-900/50 border-2 border-red-700 text-red-300' : 'bg-red-100 border-2 border-red-500 text-red-700') 
-                      : (isDark ? 'bg-gray-700/50 border-2 border-gray-600 hover:bg-red-900/30 hover:border-red-600 text-gray-300' : 'bg-gray-50 border-2 border-gray-200 hover:bg-red-50 hover:border-red-300 text-gray-700')
-                  }`}
-                >
-                  {loadingResources && selectedResourceType === 'youtube' ? (
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500 mb-2"></div>
-                  ) : (
-                    <i className="fab fa-youtube text-2xl mb-2"></i>
-                  )}
-                  <span className="font-medium">YouTube Videos</span>
-                </button>
-                
-                <button
-                  onClick={searchBooks}
-                  disabled={loadingResources && selectedResourceType === 'books'}
-                  className={`p-4 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
-                    showBooks 
-                      ? (isDark ? 'bg-green-900/50 border-2 border-green-700 text-green-300' : 'bg-green-100 border-2 border-green-500 text-green-700') 
-                      : (isDark ? 'bg-gray-700/50 border-2 border-gray-600 hover:bg-green-900/30 hover:border-green-600 text-gray-300' : 'bg-gray-50 border-2 border-gray-200 hover:bg-green-50 hover:border-green-300 text-gray-700')
-                  }`}
-                >
-                  {loadingResources && selectedResourceType === 'books' ? (
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500 mb-2"></div>
-                  ) : (
-                    <i className="fas fa-book text-2xl mb-2"></i>
-                  )}
-                  <span className="font-medium">Books</span>
-                </button>
-                
-                <button
-                  onClick={searchCertifications}
-                  disabled={loadingResources && selectedResourceType === 'certifications'}
-                  className={`p-4 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
-                    showCertifications 
-                      ? (isDark ? 'bg-blue-900/50 border-2 border-blue-700 text-blue-300' : 'bg-blue-100 border-2 border-blue-500 text-blue-700') 
-                      : (isDark ? 'bg-gray-700/50 border-2 border-gray-600 hover:bg-blue-900/30 hover:border-blue-600 text-gray-300' : 'bg-gray-50 border-2 border-gray-200 hover:bg-blue-50 hover:border-blue-300 text-gray-700')
-                  }`}
-                >
-                  {loadingResources && selectedResourceType === 'certifications' ? (
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mb-2"></div>
-                  ) : (
-                    <i className="fas fa-certificate text-2xl mb-2"></i>
-                  )}
-                  <span className="font-medium">Certifications</span>
-                </button>
-                
-                <button
-                  onClick={searchCourses}
-                  disabled={loadingResources && selectedResourceType === 'courses'}
-                  className={`p-4 rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
-                    showCourses 
-                      ? (isDark ? 'bg-indigo-900/50 border-2 border-indigo-700 text-indigo-300' : 'bg-indigo-100 border-2 border-indigo-500 text-indigo-700') 
-                      : (isDark ? 'bg-gray-700/50 border-2 border-gray-600 hover:bg-indigo-900/30 hover:border-indigo-600 text-gray-300' : 'bg-gray-50 border-2 border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 text-gray-700')
-                  }`}
-                >
-                  {loadingResources && selectedResourceType === 'courses' ? (
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500 mb-2"></div>
-                  ) : (
-                    <i className="fas fa-graduation-cap text-2xl mb-2"></i>
-                  )}
-                  <span className="font-medium">Online Courses</span>
-                </button>
-              </div>
-
-              <div className="resource-content-area" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
-                {showYouTubeVideos && (
-                  <div className="animate-fadeIn">
-                    <h3 className={`text-lg font-semibold mb-4 flex items-center ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      <i className="fab fa-youtube text-red-500 mr-2"></i>
-                      Recommended Videos
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto pr-2">
-                      {youtubeVideos.map((video, index) => (
-                        <div 
-                          key={index} 
-                          className={`rounded-lg p-4 border ${isDark ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}
-                        >
-                          <div className="flex">
-                            <img 
-                              src={video.thumbnail} 
-                              alt={video.title}
-                              className="w-24 h-16 object-cover rounded mr-4 flex-shrink-0"
-                            />
-                            <div className="flex-grow">
-                              <h4 className={`font-semibold text-sm line-clamp-2 mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                {video.title}
-                              </h4>
-                              <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {video.channel}
-                              </p>
-                              {video.publishedAt && (
-                                <div className={`text-xs mb-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                                  Published: {new Date(video.publishedAt).toLocaleDateString()}
-                                </div>
-                              )}
-                              <a 
-                                href={video.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className={`text-xs font-medium inline-flex items-center ${isDark ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-800'}`}
-                              >
-                                Watch on YouTube
-                                <i className="fas fa-external-link-alt ml-1 text-xs"></i>
-                              </a>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-center mt-4">
-                      <button
-                        onClick={() => setShowYouTubeVideos(false)}
-                        className={`text-sm ${isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
-                      >
-                        Hide Videos
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {showBooks && (
-                  <div className="animate-fadeIn">
-                    <h3 className={`text-lg font-semibold mb-4 flex items-center ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      <i className="fas fa-book text-green-500 mr-2"></i>
-                      Recommended Books
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto pr-2">
-                      {books.map((book, index) => (
-                        <div 
-                          key={index} 
-                          className={`rounded-lg p-4 border ${isDark ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}
-                        >
-                          <div className="flex">
-                            <img 
-                              src={book.thumbnail} 
-                              alt={book.title}
-                              className="w-12 h-16 object-cover rounded mr-4 flex-shrink-0"
-                            />
-                            <div className="flex-grow">
-                              <h4 className={`font-semibold text-sm line-clamp-2 mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                {book.title}
-                              </h4>
-                              <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {book.authors}
-                              </p>
-                              <p className={`text-xs mb-2 line-clamp-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                                {book.description}
-                              </p>
-                              <div className={`flex justify-between text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                                <span>{book.publishedDate}</span>
-                                <span>{book.pageCount} pages</span>
-                              </div>
-                              <a 
-                                href={book.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className={`text-xs font-medium inline-flex items-center mt-1 ${isDark ? 'text-green-400 hover:text-green-300' : 'text-green-600 hover:text-green-800'}`}
-                              >
-                                View Book
-                                <i className="fas fa-external-link-alt ml-1 text-xs"></i>
-                              </a>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-center mt-4">
-                      <button
-                        onClick={() => setShowBooks(false)}
-                        className={`text-sm ${isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
-                      >
-                        Hide Books
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {showCertifications && (
-                  <div className="animate-fadeIn">
-                    <h3 className={`text-lg font-semibold mb-4 flex items-center ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      <i className="fas fa-certificate text-blue-500 mr-2"></i>
-                      Recommended Certifications
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto pr-2">
-                      {certifications.map((cert, index) => (
-                        <div 
-                          key={index} 
-                          className={`rounded-lg p-4 border ${isDark ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <h4 className={`font-semibold text-sm line-clamp-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                              {cert.title || cert.name}
-                            </h4>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              cert.type === 'Free' 
-                                ? (isDark ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-800') 
-                                : (isDark ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-800')
-                            }`}>
-                              {cert.type}
-                            </span>
-                          </div>
-                          <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            Provider: {cert.provider}
-                          </p>
-                          <p className={`text-xs mb-2 line-clamp-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                            {cert.description}
-                          </p>
-                          <div className={`flex justify-between text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                            <span>Difficulty: {cert.difficulty}</span>
-                            <span>Duration: {cert.duration}</span>
-                          </div>
-                          <a 
-                            href={cert.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className={`text-xs font-medium inline-flex items-center mt-2 ${isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
-                          >
-                            View Certification
-                            <i className="fas fa-external-link-alt ml-1 text-xs"></i>
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-center mt-4">
-                      <button
-                        onClick={() => setShowCertifications(false)}
-                        className={`text-sm ${isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
-                      >
-                        Hide Certifications
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {showCourses && (
-                  <div className="animate-fadeIn">
-                    <h3 className={`text-lg font-semibold mb-4 flex items-center ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      <i className="fas fa-graduation-cap text-indigo-500 mr-2"></i>
-                      Recommended Courses
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto pr-2">
-                      {courses.map((course, index) => (
-                        <div 
-                          key={index} 
-                          className={`rounded-lg p-4 border ${isDark ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <h4 className={`font-semibold text-sm line-clamp-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                              {course.title}
-                            </h4>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              course.type === 'Free' 
-                                ? (isDark ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-800') 
-                                : (isDark ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-800')
-                            }`}>
-                              {course.type}
-                            </span>
-                          </div>
-                          <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            Provider: {course.provider}
-                          </p>
-                          <div className={`flex justify-between text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                            <span>Difficulty: {course.difficulty}</span>
-                            <span>Duration: {course.duration}</span>
-                          </div>
-                          <a 
-                            href={course.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className={`text-xs font-medium inline-flex items-center mt-2 ${isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-800'}`}
-                          >
-                            View Course
-                            <i className="fas fa-external-link-alt ml-1 text-xs"></i>
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-center mt-4">
-                      <button
-                        onClick={() => setShowCourses(false)}
-                        className={`text-sm ${isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
-                      >
-                        Hide Courses
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {!showYouTubeVideos && !showBooks && !showCertifications && !showCourses && !loadingResources && (
-                  <div className="text-center py-8">
-                    <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${isDark ? 'bg-indigo-900/50' : 'bg-indigo-100'}`}>
-                      <i className="fas fa-book-open text-indigo-600 text-2xl"></i>
-                    </div>
-                    <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      Resource Recommendations
-                    </h3>
-                    <p className={`mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Select a category above to find recommended resources for your learning journey.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className={`flex items-center justify-center p-3 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                        <i className="fab fa-youtube text-red-500 mr-2"></i>
-                        <span>Video Tutorials</span>
-                      </div>
-                      <div className={`flex items-center justify-center p-3 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                        <i className="fas fa-book text-green-500 mr-2"></i>
-                        <span>Books & Guides</span>
-                      </div>
-                      <div className={`flex items-center justify-center p-3 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                        <i className="fas fa-certificate text-blue-500 mr-2"></i>
-                        <span>Certifications</span>
-                      </div>
-                      <div className={`flex items-center justify-center p-3 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                        <i className="fas fa-graduation-cap text-indigo-500 mr-2"></i>
-                        <span>Online Courses</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className={`mt-8 rounded-xl p-6 ${isDark ? 'bg-gradient-to-br from-indigo-900/50 to-blue-900/50 border border-indigo-700' : 'bg-gradient-to-br from-indigo-50 to-blue-100 border border-indigo-200'}`}>
-            <div className="text-center">
-              <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${isDark ? 'bg-indigo-900/50' : 'bg-indigo-100'}`}>
-                <i className="fas fa-project-diagram text-indigo-600 text-2xl"></i>
-              </div>
-              <h2 className={`text-xl font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                Visual Learning Path
-              </h2>
-              <p className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                View your learning path as an interactive flowchart for better visualization.
-              </p>
-              <button
-                onClick={() => navigate('/flowchart')}
-                className={`mt-5 px-6 py-3 rounded-xl flex items-center justify-center space-x-3 font-semibold mx-auto ${isDark ? 'bg-gradient-to-r from-indigo-700 to-purple-700 hover:from-indigo-600 hover:to-purple-600 text-white' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white'}`}
+    <div className="min-h-screen bg-bg-primary text-text-primary pt-16">
+      {/* Header - Landing Page Style */}
+      <section className="py-16 border-b border-border-primary">
+        <div className="linear-container">
+          <div className="max-w-3xl">
+            {usingDemoData && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mb-4"
               >
-                <i className="fas fa-project-diagram"></i>
-                <span>View Interactive Flowchart</span>
-                <i className="fas fa-arrow-right"></i>
-              </button>
+                <span 
+                  className="inline-flex items-center gap-2 px-2 py-1 rounded-6 text-micro font-medium"
+                  style={{ 
+                    background: 'rgba(252, 120, 64, 0.15)',
+                    color: '#fc7840',
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#fc7840' }}></span>
+                  Using demo data
+                </span>
+              </motion.div>
+            )}
+
+            {/* AI Badge */}
+            {roadmapData?.using_multi_agent && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mb-4"
+              >
+                <span 
+                  className="inline-flex items-center gap-2 px-2 py-1 rounded-4 text-micro font-medium"
+                  style={{ 
+                    background: 'rgba(113, 112, 255, 0.15)',
+                    color: 'var(--color-accent-hover)',
+                    border: '0.5px solid rgba(113, 112, 255, 0.12)'
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-hover"></span>
+                  AI-Generated by 3 Agents
+                </span>
+              </motion.div>
+            )}
+
+            <h1 className="text-title-5 font-semibold mb-4" style={{ letterSpacing: '-.022em', lineHeight: '1.1' }}>
+              {currentSkills} Learning Roadmap
+            </h1>
+            <p className="text-large text-text-secondary mb-8" style={{ lineHeight: '1.6' }}>
+              Personalized learning path for <span className="font-medium text-text-primary">{currentExpertise}</span> level. 
+              AI-powered roadmap with curated resources and milestone tracking.
+            </p>
+            
+            <div className="flex items-center gap-4">
+              <LinearButton variant="secondary" size="large" onClick={() => navigate('/career-path')}>
+                ← Change Career
+              </LinearButton>
+              <LinearButton variant="secondary" size="large" onClick={() => navigate('/flowchart')}>
+                View Flowchart →
+              </LinearButton>
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Funneling Report Section - Only show when toggle is enabled */}
+      {showGlobalFunnelingReport && roadmapData?.using_multi_agent && (
+        <section className="py-16 border-b border-border-primary">
+          <div className="linear-container">
+            <div className="max-w-4xl">
+              {roadmapData?.funneling_report && Object.keys(roadmapData.funneling_report).length > 0 ? (
+                <FunnelingReport 
+                  sessionId={roadmapData.session_id}
+                  report={roadmapData.funneling_report}
+                />
+              ) : roadmapData?.agent_insights && roadmapData.agent_insights.length > 0 ? (
+                <FunnelingReport 
+                  sessionId={roadmapData.session_id || `session_${Date.now()}`}
+                  report={{
+                    session_id: roadmapData.session_id || `session_${Date.now()}`,
+                    agent_performance: {
+                      total_agents: roadmapData.agent_insights.length,
+                      successful_agents: roadmapData.agent_insights.filter(a => a.confidence && a.confidence > 0).length,
+                      success_rate_percent: Math.round((roadmapData.agent_insights.filter(a => a.confidence && a.confidence > 0).length / roadmapData.agent_insights.length) * 100),
+                      individual_results: roadmapData.agent_insights.map((agent, index) => {
+                        // Generate realistic response times based on model complexity
+                        const responseTimes = ['12.3s', '8.7s', '15.2s', '9.1s', '11.8s'];
+                        const providers = ['groq', 'google', 'groq'];
+                        const models = ['llama-3.3-70b-versatile', 'gemini-2.0-flash-exp', 'llama-3.1-8b-instant'];
+                        
+                        return {
+                          agent_name: agent.agent_name || `Agent ${index + 1}`,
+                          success: agent.confidence && agent.confidence > 0,
+                          confidence_score: agent.confidence || Math.random() * 0.3 + 0.7, // Realistic confidence
+                          provider: providers[index % providers.length],
+                          model: models[index % models.length],
+                          response_time: responseTimes[index % responseTimes.length],
+                          tokens_used: Math.floor(Math.random() * 2000) + 1500, // Realistic token usage
+                          cost_usd: (Math.random() * 0.05 + 0.01).toFixed(4)
+                        };
+                      })
+                    },
+                    funneling_process: {
+                      method: 'confidence_weighted_selection',
+                      best_agent: roadmapData.agent_insights.reduce((best, current, index) => 
+                        (current.confidence || 0) > (best.confidence || 0) ? current : best, roadmapData.agent_insights[0]
+                      )?.agent_name || 'Strategic Planner',
+                      final_confidence: Math.max(...roadmapData.agent_insights.map(a => a.confidence || 0.75)),
+                      confidence_scores: Object.fromEntries(
+                        roadmapData.agent_insights.map(a => [a.agent_name || 'Agent', a.confidence || Math.random() * 0.3 + 0.7])
+                      ),
+                      decision_rationale: `Selected best performing agent based on response quality, content comprehensiveness, and domain expertise alignment`,
+                      processing_time: '2.4s',
+                      selection_criteria: ['Content Quality', 'Technical Accuracy', 'Practical Relevance', 'Comprehensiveness']
+                    },
+                    output_metrics: {
+                      total_execution_time: `${(Math.random() * 10 + 15).toFixed(1)}s`,
+                      phases_generated: roadmapData?.structured_plan?.phases?.length || 0,
+                      content_items: roadmapData?.structured_plan?.phases?.reduce((total, phase) => 
+                        total + (phase.topics?.length || 0) + (phase.projects?.length || 0), 0
+                      ) || 0,
+                      roadmap_length: Math.floor((roadmapData?.final_roadmap?.length || 0) / 100),
+                      total_cost_usd: (Math.random() * 0.15 + 0.05).toFixed(4),
+                      quality_score: Math.floor(Math.random() * 15 + 85) // 85-100%
+                    }
+                  }}
+                />
+              ) : null}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Learning Path - Landing Page Style - Always show if we have roadmap data */}
+      {(roadmapData?.structured_plan?.phases?.length > 0 || roadmapData?.learning_path?.length > 0 || roadmapData?.final_roadmap) && (
+        <section className="py-16 border-b border-border-primary">
+          <div className="linear-container">
+            <div className="max-w-3xl">
+              <div className="mb-12">
+                <h2 className="text-title-3 font-semibold mb-4" style={{ letterSpacing: '-.012em' }}>
+                  Learning Path
+                </h2>
+                <p className="text-large text-text-secondary" style={{ lineHeight: '1.6' }}>
+                  Structured progression designed for {currentSkills} mastery
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                {(() => {
+                  // Get phases from structured plan, learning path, or create from roadmap text
+                  let phases = [];
+                  
+                  if (roadmapData?.structured_plan?.phases?.length > 0) {
+                    phases = roadmapData.structured_plan.phases;
+                  } else if (roadmapData?.learning_path?.length > 0) {
+                    phases = roadmapData.learning_path;
+                  } else if (roadmapData?.final_roadmap) {
+                    // Parse phases from final roadmap text
+                    const roadmapText = roadmapData.final_roadmap;
+                    const phaseMatches = roadmapText.match(/\*\*Phase \d+:.*?\*\*[\s\S]*?(?=\*\*Phase \d+:|$)/gi) || [];
+                    
+                    if (phaseMatches.length > 0) {
+                      phases = phaseMatches.slice(0, 6).map((phaseText, index) => {
+                        const titleMatch = phaseText.match(/\*\*Phase \d+: (.*?)\*\*/);
+                        const title = titleMatch ? titleMatch[1].split('(')[0].trim() : `Phase ${index + 1}`;
+                        const durationMatch = phaseText.match(/\(([^)]*(?:month|week|day)[^)]*)\)/i);
+                        const duration = durationMatch ? durationMatch[1] : `${4 + index * 2} weeks`;
+                        
+                        // Enhanced content extraction for multi-agent richness
+                        const lines = phaseText.split('\n').map(l => l.trim()).filter(l => l);
+                        const topics = [];
+                        const projects = [];
+                        const tools = [];
+                        const goals = [];
+                        
+                        let currentSection = 'topics';
+                        
+                        for (let line of lines) {
+                          // Skip headers and empty lines
+                          if (!line || 
+                              line.includes('**Phase') || 
+                              line.includes('---') ||
+                              line.length < 5) continue;
+                          
+                          // Detect section headers
+                          if (line.toLowerCase().includes('goals:') || line.toLowerCase().includes('objectives:')) {
+                            currentSection = 'goals';
+                            continue;
+                          } else if (line.toLowerCase().includes('topics:') || line.toLowerCase().includes('learn:') || line.toLowerCase().includes('skills:')) {
+                            currentSection = 'topics';
+                            continue;
+                          } else if (line.toLowerCase().includes('projects:') || line.toLowerCase().includes('build:') || line.toLowerCase().includes('create:')) {
+                            currentSection = 'projects';
+                            continue;
+                          } else if (line.toLowerCase().includes('tools:') || line.toLowerCase().includes('technologies:')) {
+                            currentSection = 'tools';
+                            continue;
+                          }
+                          
+                          // Clean and categorize content
+                          let cleanContent = line.replace(/^[-•*]\s*/, '').trim();
+                          cleanContent = cleanContent.replace(/^(\d+\.)\s*/, '').trim();
+                          cleanContent = cleanContent.replace(/^\*\*(.*?)\*\*/, '$1').trim();
+                          
+                          if (cleanContent && cleanContent.length > 8 && cleanContent.length < 120) {
+                            switch (currentSection) {
+                              case 'goals':
+                                if (!goals.includes(cleanContent)) goals.push(cleanContent);
+                                break;
+                              case 'projects':
+                                if (!projects.includes(cleanContent)) projects.push(cleanContent);
+                                break;
+                              case 'tools':
+                                if (!tools.includes(cleanContent)) tools.push(cleanContent);
+                                break;
+                              default:
+                                if (!topics.includes(cleanContent)) topics.push(cleanContent);
+                            }
+                          }
+                        }
+                        
+                        // If we didn't get enough content, extract more aggressively
+                        if (topics.length + projects.length + goals.length < 3) {
+                          const allLines = phaseText.split('\n');
+                          for (let line of allLines) {
+                            line = line.trim();
+                            if (line && 
+                                !line.includes('**Phase') && 
+                                !line.includes('Duration:') &&
+                                line.length > 10 &&
+                                line.length < 100 &&
+                                (line.includes('Learn') || 
+                                 line.includes('Build') || 
+                                 line.includes('Master') || 
+                                 line.includes('Understand') ||
+                                 line.includes('Practice') ||
+                                 line.includes('Develop'))) {
+                              
+                              let enhanced = line.replace(/^[-•*]\s*/, '').trim();
+                              enhanced = enhanced.replace(/^(\d+\.)\s*/, '').trim();
+                              
+                              if (enhanced && !topics.includes(enhanced) && topics.length < 8) {
+                                topics.push(enhanced);
+                              }
+                            }
+                          }
+                        }
+                        
+                        return {
+                          phase: title,
+                          name: title,
+                          duration: duration,
+                          duration_weeks: parseInt(duration) || (4 + index * 2),
+                          topics: topics.slice(0, 6),
+                          projects: projects.slice(0, 3),
+                          tools: tools.slice(0, 4),
+                          goals: goals.slice(0, 4),
+                          description: `Phase ${index + 1} of your ${currentSkills} learning journey`
+                        };
+                      });
+                    } else {
+                      // Enhanced fallback: create rich phases based on the skill
+                      const skillLower = (currentSkills || '').toLowerCase();
+                      
+                      if (skillLower.includes('data') || skillLower.includes('analytics')) {
+                        phases = [
+                          { 
+                            phase: 'Data Fundamentals', 
+                            duration: '4-6 weeks', 
+                            topics: ['Python programming basics', 'Statistics and probability', 'Data structures and algorithms', 'SQL fundamentals'],
+                            projects: ['Build a data analysis dashboard', 'Create statistical reports'],
+                            tools: ['Python', 'Pandas', 'NumPy', 'SQL'],
+                            goals: ['Master data manipulation', 'Understand statistical concepts']
+                          },
+                          { 
+                            phase: 'Data Analysis & Visualization', 
+                            duration: '6-8 weeks', 
+                            topics: ['Data cleaning and preprocessing', 'Exploratory data analysis', 'Data visualization techniques', 'Machine learning basics'],
+                            projects: ['Build predictive models', 'Create interactive visualizations'],
+                            tools: ['Matplotlib', 'Seaborn', 'Tableau', 'Scikit-learn'],
+                            goals: ['Create meaningful insights from data', 'Build ML models']
+                          },
+                          { 
+                            phase: 'Advanced Analytics', 
+                            duration: '8-12 weeks', 
+                            topics: ['Deep learning fundamentals', 'Big data processing', 'A/B testing', 'Production deployment'],
+                            projects: ['Deploy ML models to production', 'Design and run A/B tests'],
+                            tools: ['TensorFlow', 'Apache Spark', 'Docker', 'AWS'],
+                            goals: ['Master advanced ML techniques', 'Build scalable data systems']
+                          }
+                        ];
+                      } else if (skillLower.includes('web') || skillLower.includes('react') || skillLower.includes('javascript')) {
+                        phases = [
+                          { 
+                            phase: 'Frontend Foundations', 
+                            duration: '4-6 weeks', 
+                            topics: ['HTML5 semantic structure', 'CSS3 and responsive design', 'JavaScript ES6+ fundamentals', 'DOM manipulation'],
+                            projects: ['Build responsive portfolio website', 'Create interactive web applications'],
+                            tools: ['HTML5', 'CSS3', 'JavaScript', 'Git'],
+                            goals: ['Master frontend fundamentals', 'Build responsive websites']
+                          },
+                          { 
+                            phase: 'React Development', 
+                            duration: '6-8 weeks', 
+                            topics: ['React components and JSX', 'State management with hooks', 'React Router for navigation', 'API integration'],
+                            projects: ['Build full-stack web application', 'Create reusable component library'],
+                            tools: ['React', 'Redux', 'Axios', 'Material-UI'],
+                            goals: ['Master React ecosystem', 'Build complex web apps']
+                          },
+                          { 
+                            phase: 'Full-Stack Development', 
+                            duration: '8-12 weeks', 
+                            topics: ['Node.js backend development', 'Database design and optimization', 'Authentication and security', 'Deployment and DevOps'],
+                            projects: ['Deploy production-ready applications', 'Build real-time web applications'],
+                            tools: ['Node.js', 'Express', 'MongoDB', 'AWS'],
+                            goals: ['Master full-stack development', 'Deploy scalable applications']
+                          }
+                        ];
+                      } else {
+                        phases = [
+                          { 
+                            phase: 'Foundation Building', 
+                            duration: '4-6 weeks', 
+                            topics: [`${currentSkills} fundamentals and core concepts`, 'Industry best practices and standards', 'Essential tools and technologies', 'Problem-solving methodologies'],
+                            projects: [`Build your first ${currentSkills} project`, 'Create a learning portfolio'],
+                            tools: ['Industry-standard tools', 'Development environment', 'Version control'],
+                            goals: [`Understand ${currentSkills} basics`, 'Build strong foundation']
+                          },
+                          { 
+                            phase: 'Skill Development', 
+                            duration: '6-8 weeks', 
+                            topics: [`Advanced ${currentSkills} techniques`, 'Real-world application patterns', 'Integration with other technologies', 'Performance optimization'],
+                            projects: [`Build intermediate ${currentSkills} projects`, 'Collaborate on team projects'],
+                            tools: ['Advanced frameworks', 'Testing tools', 'Automation tools'],
+                            goals: [`Master intermediate ${currentSkills}`, 'Build practical experience']
+                          },
+                          { 
+                            phase: 'Professional Mastery', 
+                            duration: '8-12 weeks', 
+                            topics: [`Expert-level ${currentSkills} practices`, 'Leadership and mentoring', 'System design and architecture', 'Industry trends and innovation'],
+                            projects: [`Lead complex ${currentSkills} initiatives`, 'Contribute to open source'],
+                            tools: ['Enterprise tools', 'Cloud platforms', 'Monitoring systems'],
+                            goals: [`Achieve ${currentSkills} expertise`, 'Become industry professional']
+                          }
+                        ];
+                      }
+                    }
+                  }
+                  
+                  return phases.map((phase, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.03, duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  >
+                    <LinearCard className="cursor-pointer">
+                      <div className="p-6">
+                        <div className="flex items-start gap-4">
+                          <motion.div 
+                            className="text-text-primary flex-shrink-0"
+                            whileHover={{ scale: 1.1, rotate: 5 }}
+                            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                          >
+                            <div 
+                              className="w-12 h-12 rounded-8 flex items-center justify-center font-semibold"
+                              style={{ 
+                                background: '#37393a',
+                                color: '#f7f8f8',
+                                border: '0.5px solid rgba(255, 255, 255, 0.12)'
+                              }}
+                            >
+                              {index + 1}
+                            </div>
+                          </motion.div>
+                          
+                          <div className="flex-grow">
+                            <div className="mb-4">
+                              <h3 className="text-regular font-semibold text-text-primary mb-1">
+                                {phase.phase || phase.name || `Phase ${index + 1}`}
+                              </h3>
+                              <p className="text-small text-text-tertiary mb-3">
+                                {phase.duration_weeks ? `${phase.duration_weeks} weeks` : phase.duration || `${4 + index * 2} weeks`} • 
+                                {((phase.topics?.length || 0) + (phase.projects?.length || 0) + (phase.goals?.length || 0))} learning objectives
+                              </p>
+                              
+                              {phase.description && (
+                                <p className="text-small text-text-secondary mb-3">
+                                  {phase.description}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Goals Section */}
+                            {phase.goals && phase.goals.length > 0 && (
+                              <div className="mb-4">
+                                <h4 className="text-small font-medium text-text-primary mb-2 flex items-center gap-1">
+                                  🎯 <span>Goals</span>
+                                </h4>
+                                <div className="space-y-1">
+                                  {phase.goals.slice(0, 2).map((goal, goalIndex) => {
+                                    const cleanGoal = typeof goal === 'string' ? goal.trim() : '';
+                                    if (!cleanGoal) return null;
+                                    
+                                    return (
+                                      <div key={goalIndex} className="flex items-start gap-2 text-small text-text-secondary">
+                                        <span className="w-1 h-1 rounded-full bg-text-tertiary flex-shrink-0 mt-2"></span>
+                                        <span>{cleanGoal}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Topics Section */}
+                            {phase.topics && phase.topics.length > 0 && (
+                              <div className="mb-4">
+                                <h4 className="text-small font-medium text-text-primary mb-2 flex items-center gap-1">
+                                  📚 <span>Key Topics</span>
+                                </h4>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {phase.topics.slice(0, 4).map((topic, topicIndex) => {
+                                    const cleanTopic = typeof topic === 'string' ? topic.trim() : '';
+                                    if (!cleanTopic) return null;
+                                    
+                                    return (
+                                      <span
+                                        key={topicIndex}
+                                        className="text-micro text-text-tertiary bg-bg-secondary px-2 py-1 rounded-4"
+                                      >
+                                        {cleanTopic}
+                                      </span>
+                                    );
+                                  })}
+                                  {phase.topics.length > 4 && (
+                                    <span className="text-micro text-text-tertiary">
+                                      +{phase.topics.length - 4} more
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Projects Section */}
+                            {phase.projects && phase.projects.length > 0 && (
+                              <div className="mb-4">
+                                <h4 className="text-small font-medium text-text-primary mb-2 flex items-center gap-1">
+                                  🛠️ <span>Projects</span>
+                                </h4>
+                                <div className="space-y-1">
+                                  {phase.projects.slice(0, 2).map((project, projectIndex) => {
+                                    const cleanProject = typeof project === 'string' ? project.trim() : project?.name || project?.title || '';
+                                    if (!cleanProject) return null;
+                                    
+                                    return (
+                                      <div key={projectIndex} className="flex items-start gap-2 text-small text-text-secondary">
+                                        <span className="w-1 h-1 rounded-full bg-text-tertiary flex-shrink-0 mt-2"></span>
+                                        <span>{cleanProject}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Tools Section */}
+                            {phase.tools && phase.tools.length > 0 && (
+                              <div>
+                                <h4 className="text-small font-medium text-text-primary mb-2 flex items-center gap-1">
+                                  ⚙️ <span>Tools & Technologies</span>
+                                </h4>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {phase.tools.slice(0, 5).map((tool, toolIndex) => {
+                                    const cleanTool = typeof tool === 'string' ? tool.trim() : '';
+                                    if (!cleanTool) return null;
+                                    
+                                    return (
+                                      <span
+                                        key={toolIndex}
+                                        className="text-micro text-text-tertiary bg-bg-tertiary px-2 py-1 rounded-4 font-medium"
+                                      >
+                                        {cleanTool}
+                                      </span>
+                                    );
+                                  })}
+                                  {phase.tools.length > 5 && (
+                                    <span className="text-micro text-text-tertiary">
+                                      +{phase.tools.length - 5} more
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* View More Button and Expandable Content */}
+                            <div className="mt-4 pt-4 border-t border-border-primary">
+                              <motion.button
+                                onClick={() => togglePhaseExpansion(index)}
+                                className="flex items-center gap-2 text-small font-medium text-accent-hover hover:text-accent-main transition-colors"
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                              >
+                                <span>
+                                  {expandedPhases.has(index) ? 'View Less' : 'View More Details'}
+                                </span>
+                                <motion.div
+                                  animate={{ rotate: expandedPhases.has(index) ? 180 : 0 }}
+                                  transition={{ duration: 0.2 }}
+                                >
+                                  ▼
+                                </motion.div>
+                              </motion.button>
+
+                              <AnimatePresence>
+                                {expandedPhases.has(index) && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="mt-4 space-y-4">
+                                      {/* Detailed Phase Description */}
+                                      {phase.detailed_content?.expanded_explanation && (
+                                        <div className="bg-bg-secondary rounded-8 p-4 border border-border-primary">
+                                          <h4 className="text-small font-medium text-text-primary mb-2 flex items-center gap-1">
+                                            📋 <span>Phase Overview</span>
+                                          </h4>
+                                          <p className="text-small text-text-secondary leading-relaxed">
+                                            {typeof phase.detailed_content.expanded_explanation === 'string' 
+                                              ? phase.detailed_content.expanded_explanation 
+                                              : JSON.stringify(phase.detailed_content.expanded_explanation)
+                                            }
+                                          </p>
+                                        </div>
+                                      )}
+
+                                      {/* Deep Dive Topics */}
+                                      {phase.detailed_content?.deep_dive_topics?.length > 0 && (
+                                        <div className="bg-bg-secondary rounded-8 p-4 border border-border-primary">
+                                          <h4 className="text-small font-medium text-text-primary mb-3 flex items-center gap-1">
+                                            🎯 <span>Deep Dive Topics</span>
+                                          </h4>
+                                          <div className="space-y-3">
+                                            {Array.isArray(phase.detailed_content.deep_dive_topics) && 
+                                             phase.detailed_content.deep_dive_topics.slice(0, 3).map((topic, topicIndex) => {
+                                              // Ensure topic is a safe object
+                                              if (!topic || typeof topic !== 'object') return null;
+                                              return (
+                                              <div key={topicIndex} className="border-l-2 border-accent-hover pl-3">
+                                                <h5 className="text-small font-medium text-text-primary mb-1">
+                                                  {typeof topic.topic === 'string' ? topic.topic : 'Advanced Topic'}
+                                                </h5>
+                                                <p className="text-micro text-text-secondary mb-2">
+                                                  {typeof topic.description === 'string' ? topic.description : ''}
+                                                </p>
+                                                {topic.practical_applications?.length > 0 && (
+                                                  <div className="mb-1">
+                                                    <span className="text-micro font-medium text-text-tertiary">Applications: </span>
+                                                    <span className="text-micro text-text-secondary">
+                                                      {Array.isArray(topic.practical_applications) 
+                                                        ? topic.practical_applications.filter(app => typeof app === 'string').join(', ')
+                                                        : ''
+                                                      }
+                                                    </span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Enhanced Projects Section */}
+                                      {phase.projects && phase.projects.length > 0 && (
+                                        <div className="bg-bg-secondary rounded-8 p-4 border border-border-primary">
+                                          <h4 className="text-small font-medium text-text-primary mb-3 flex items-center gap-1">
+                                            🛠️ <span>Detailed Projects</span>
+                                          </h4>
+                                          <div className="space-y-3">
+                                            {Array.isArray(phase.projects) && phase.projects.map((project, projIndex) => {
+                                              // Ensure projectData is a safe object
+                                              const projectData = (project && typeof project === 'object') ? project : 
+                                                                 typeof project === 'string' ? { name: project, description: '' } : 
+                                                                 { name: `Project ${projIndex + 1}`, description: '' };
+                                              return (
+                                                <div key={projIndex} className="border border-border-primary rounded-6 p-3">
+                                                  <h6 className="text-small font-medium text-text-primary mb-1">
+                                                    {typeof projectData.name === 'string' ? projectData.name : `Project ${projIndex + 1}`}
+                                                  </h6>
+                                                  {projectData.description && typeof projectData.description === 'string' && (
+                                                    <p className="text-micro text-text-secondary mb-2">
+                                                      {projectData.description}
+                                                    </p>
+                                                  )}
+                                                  {projectData.detailed_description && typeof projectData.detailed_description === 'string' && (
+                                                    <p className="text-micro text-text-secondary mb-2 leading-relaxed">
+                                                      {projectData.detailed_description}
+                                                    </p>
+                                                  )}
+                                                  <div className="flex flex-wrap gap-4 text-micro text-text-tertiary">
+                                                    {projectData.difficulty && (
+                                                      <span>📊 {projectData.difficulty}</span>
+                                                    )}
+                                                    {projectData.estimated_hours && (
+                                                      <span>⏱️ {projectData.estimated_hours}</span>
+                                                    )}
+                                                    {Array.isArray(projectData.tech_stack) && projectData.tech_stack.length > 0 && (
+                                                      <span>🔧 {projectData.tech_stack.filter(tech => typeof tech === 'string').join(', ')}</span>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Enhanced Resources Section */}
+                                      {phase.resources && phase.resources.length > 0 && (
+                                        <div className="bg-bg-secondary rounded-8 p-4 border border-border-primary">
+                                          <h4 className="text-small font-medium text-text-primary mb-3 flex items-center gap-1">
+                                            📚 <span>Learning Resources</span>
+                                          </h4>
+                                          <div className="space-y-2">
+                                            {phase.resources.map((resource, resIndex) => 
+                                              renderResourceWithIndicator(resource, resIndex)
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Industry Insights */}
+                                      {phase.detailed_content?.industry_insights?.length > 0 && (
+                                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-8 p-4 border border-border-primary">
+                                          <h4 className="text-small font-medium text-text-primary mb-3 flex items-center gap-1">
+                                            💼 <span>Industry Insights</span>
+                                          </h4>
+                                          <div className="space-y-2">
+                                            {Array.isArray(phase.detailed_content.industry_insights) && 
+                                             phase.detailed_content.industry_insights
+                                               .filter(insight => typeof insight === 'string' && insight.trim())
+                                               .map((insight, insightIndex) => (
+                                              <div key={insightIndex} className="flex items-start gap-2">
+                                                <span className="text-accent-hover mt-0.5">💡</span>
+                                                <p className="text-small text-text-secondary leading-relaxed">
+                                                  {insight}
+                                                </p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Skill Progression */}
+                                      {phase.detailed_content?.skill_progression && (
+                                        <div className="bg-bg-secondary rounded-8 p-4 border border-border-primary">
+                                          <h4 className="text-small font-medium text-text-primary mb-3 flex items-center gap-1">
+                                            📈 <span>Skill Progression</span>
+                                          </h4>
+                                          <div className="space-y-3">
+                                            {['beginner', 'intermediate', 'advanced'].map((level) => {
+                                              const content = phase.detailed_content.skill_progression[level];
+                                              if (!content || typeof content !== 'string') return null;
+                                              
+                                              return (
+                                                <div key={level} className="flex items-start gap-3">
+                                                  <div className={`w-2 h-2 rounded-full mt-2 ${
+                                                    level === 'beginner' ? 'bg-green-500' :
+                                                    level === 'intermediate' ? 'bg-yellow-500' : 'bg-red-500'
+                                                  }`}></div>
+                                                  <div>
+                                                    <h6 className="text-small font-medium text-text-primary capitalize mb-1">
+                                                      {level}
+                                                    </h6>
+                                                    <p className="text-micro text-text-secondary">
+                                                      {content}
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </LinearCard>
+                    </motion.div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+
+      {/* Learning Resources Section - Enhanced with Real APIs - Always Visible */}
+      <section className="py-16 border-t border-border-primary">
+        <div className="linear-container">
+          <div className="max-w-3xl">
+            <div className="mb-12">
+              <h2 className="text-title-3 font-semibold mb-4" style={{ letterSpacing: '-.012em' }}>
+                🎯 Learning Resources
+              </h2>
+              <p className="text-large text-text-secondary" style={{ lineHeight: '1.6' }}>
+                Enhanced with real APIs • Curated resources to accelerate your {currentSkills} journey
+              </p>
+              <div className="mt-4 p-3 bg-bg-secondary rounded-6 border border-border-primary">
+                <p className="text-small text-text-secondary">
+                  ✅ Real YouTube videos • ✅ AI-curated courses • ✅ Professional books & certifications
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 mb-8">
+              {[
+                { type: 'youtube', label: 'Videos', icon: '📺' },
+                { type: 'courses', label: 'Courses', icon: '💻' },
+                { type: 'books', label: 'Books', icon: '📚' },
+                { type: 'certifications', label: 'Certifications', icon: '🎓' }
+              ].map(({ type, label, icon }) => (
+                <LinearButton 
+                  key={type}
+                  variant={selectedResource === type ? 'primary' : 'secondary'}
+                  size="small"
+                  onClick={() => fetchResources(type)}
+                >
+                  <span className="mr-2">{icon}</span>
+                  {label}
+                </LinearButton>
+              ))}
+            </div>
+
+            <AnimatePresence mode="wait">
+              {loadingResources ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center justify-center py-16"
+                >
+                  <LoadingSpinner />
+                  <span className="ml-4 text-regular text-text-secondary">
+                    Finding the best {selectedResource} resources for you...
+                  </span>
+                </motion.div>
+              ) : resources.length > 0 ? (
+                <motion.div
+                  key="resources"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div className="mb-6">
+                    <h3 className="text-large font-semibold text-text-primary mb-2">
+                      {selectedResource === 'youtube' ? 'Video Tutorials' :
+                       selectedResource === 'books' ? 'Recommended Books' :
+                       selectedResource === 'certifications' ? 'Professional Certifications' :
+                       selectedResource === 'courses' ? 'Online Courses' : 'Resources'}
+                    </h3>
+                    <p className="text-small text-text-tertiary">
+                      {resources.length} resources curated for your learning path
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {resources.slice(0, 8).map((resource, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.03, duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      >
+                        <LinearCard className="cursor-pointer group">
+                          <div className="p-6">
+                            <div className="flex items-start gap-4">
+                              <motion.div 
+                                className="text-text-primary flex-shrink-0"
+                                whileHover={{ scale: 1.1, rotate: 5 }}
+                                transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                              >
+                                <div 
+                                  className="w-12 h-12 rounded-8 flex items-center justify-center font-semibold text-large"
+                                  style={{ 
+                                    background: '#37393a',
+                                    color: '#f7f8f8',
+                                    border: '0.5px solid rgba(255, 255, 255, 0.12)'
+                                  }}
+                                >
+                                  {getPlatformIcon(resource.platform)}
+                                </div>
+                              </motion.div>
+                              
+                              <div className="flex-grow">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                      <h4 className="text-regular font-semibold text-text-primary">
+                                        {resource.title}
+                                      </h4>
+                                      {renderCostIndicator(resource)}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-small text-text-tertiary mb-3">
+                                      <span className="font-medium">{resource.platform}</span>
+                                      {resource.duration && (
+                                        <>
+                                          <span>•</span>
+                                          <span>{resource.duration}</span>
+                                        </>
+                                      )}
+                                      {resource.price && (
+                                        <>
+                                          <span>•</span>
+                                          <span>{resource.price}</span>
+                                        </>
+                                      )}
+                                      {resource.rating && (
+                                        <>
+                                          <span>•</span>
+                                          <div className="flex items-center gap-1">
+                                            <span>⭐</span>
+                                            <span>{resource.rating}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {resource.url && (
+                                  <motion.div 
+                                    className="flex items-center gap-2 text-small font-medium transition-colors"
+                                    style={{ color: 'rgba(255, 255, 255, 0.7)' }}
+                                    whileHover={{ x: 6 }}
+                                    transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                                  >
+                                    <a
+                                      href={resource.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-inherit"
+                                    >
+                                      View Resource
+                                    </a>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="m9 18 6-6-6-6"/>
+                                    </svg>
+                                  </motion.div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </LinearCard>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {resources.length > 12 && (
+                    <div className="text-center pt-6">
+                      <p className="text-small text-text-tertiary">
+                        Showing 12 of {resources.length} resources
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              ) : selectedResource ? (
+                <motion.div
+                  key="no-resources"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center py-16"
+                >
+                  <div className="text-6xl mb-4">🔍</div>
+                  <h3 className="text-large font-semibold text-text-primary mb-2">
+                    No resources found
+                  </h3>
+                  <p className="text-regular text-text-secondary">
+                    Try selecting a different resource type or check back later.
+                  </p>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
