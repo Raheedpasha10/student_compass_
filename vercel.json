@@ -1,7 +1,8 @@
 {
-  "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "Generative/frontend/build",
-  "installCommand": "cd Generative/frontend && npm install",
-  "devCommand": "cd Generative/frontend && npm start"
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
 }
