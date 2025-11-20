@@ -257,7 +257,7 @@ const SimplifiedUltimateRoadmap = () => {
           
           // Cache in sessionStorage
           try { 
-            const cacheKey = `roadmap-${queryTrimmed}-${currentExpertise}`;
+            const cacheKey = `roadmap-${currentSkills}-${currentExpertise}`;
             sessionStorage.setItem(cacheKey, JSON.stringify({ 
               timestamp: Date.now(), 
               data: finalData 
