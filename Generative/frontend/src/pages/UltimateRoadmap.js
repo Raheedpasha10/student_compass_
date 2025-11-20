@@ -154,10 +154,12 @@ const SimplifiedUltimateRoadmap = () => {
         }
         
         console.log('🤖 Generating roadmap with Multi-Agent AI System...');
-        setAgentStatus({ current: 'Multi-Agent System Activated', agents: [
-          { name: 'Strategic Planner', status: 'analyzing', model: 'Llama 3.3 70B' },
-          { name: 'Practical Guide', status: 'analyzing', model: 'Gemini 2.0 Flash' },
-          { name: 'Technical Expert', status: 'analyzing', model: 'Llama 3.1 8B' }
+        // Dynamic agent names based on specialization detection
+        const specializationAgents = getSpecializedAgents(currentSkills);
+        setAgentStatus({ current: 'Enhanced Multi-Agent System Activated', agents: [
+          { name: specializationAgents[0] || 'Strategic Planner', status: 'analyzing', model: 'Llama 3.3 70B' },
+          { name: specializationAgents[1] || 'Practical Guide', status: 'analyzing', model: 'Gemini 2.0 Flash' },
+          { name: specializationAgents[2] || 'Technical Expert', status: 'analyzing', model: 'Llama 3.1 8B' }
         ]});
         
         // Use Multi-Agent System for comprehensive analysis

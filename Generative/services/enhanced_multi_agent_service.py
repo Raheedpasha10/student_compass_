@@ -32,7 +32,7 @@ class EnhancedMultiAgentService:
     def __init__(self):
         # Initialize API clients
         self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        genai.configure(api_key=os.getenv("GOOGLE_GENAI_API_KEY"))
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
         self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
         self.current_session_id = None
         
@@ -223,54 +223,111 @@ class EnhancedMultiAgentService:
         
         expertise = agent_expertise.get(agent_role, "industry best practices and professional development")
         
-        base_prompt = f"""You are a world-class {agent_role.replace('_', ' ')} with 15+ years of experience in {specialization.replace('_', ' ')}. 
-Your specialization is in {expertise}.
+        base_prompt = f"""You are an elite {agent_role.replace('_', ' ')} with 20+ years of experience leading teams at top-tier companies like Google, Microsoft, and Tesla in {specialization.replace('_', ' ')}. You have personally mentored 500+ professionals and are known for creating transformative learning experiences.
 
-LEARNER PROFILE:
-- Query: {query}
-- Experience Level: {experience_level}
-- Field Focus: {', '.join(focus_areas)}
-- Learning Style: {learning_approach.replace('_', ' ')}
+🎯 YOUR EXPERTISE: {expertise}
 
-MISSION: Create a comprehensive, actionable learning roadmap that is specifically tailored to {specialization.replace('_', ' ')}.
+📋 LEARNER ANALYSIS:
+- Career Goal: {query}  
+- Current Level: {experience_level}
+- Specialization Focus: {', '.join(focus_areas)}
+- Optimal Learning Method: {learning_approach.replace('_', ' ')}
 
-ROADMAP REQUIREMENTS:
-1. **Industry-Specific Content**: Include current industry trends, tools, and technologies for {specialization.replace('_', ' ')}
-2. **Experience-Appropriate**: Perfectly calibrated for {experience_level} level learners
-3. **Practical Focus**: Emphasize {learning_approach.replace('_', ' ')} learning methodology
-4. **Timeline Structure**: Use {timeline.replace('_', ' ')} progression model
-5. **Real-World Application**: Include industry projects, case studies, and portfolio pieces
-6. **Career Progression**: Clear path from current level to professional competency
+🚀 MISSION: Design an industry-leading, comprehensive learning roadmap that transforms this learner into a highly-skilled {specialization.replace('_', ' ')} professional ready for top-tier opportunities.
 
-STRUCTURE YOUR RESPONSE AS:
-**Phase 1: Foundation Building (Duration)**
-- Core concepts and fundamentals specific to {specialization.replace('_', ' ')}
-- Essential tools and technologies
-- Foundational projects
-- Industry knowledge basics
+📊 ROADMAP REQUIREMENTS:
+✅ **Industry Authority**: Include cutting-edge trends, emerging technologies, and insider knowledge
+✅ **Precision Targeting**: Perfectly calibrated for {experience_level} → Expert progression  
+✅ **Practical Mastery**: Heavy emphasis on {learning_approach.replace('_', ' ')} with real deliverables
+✅ **Career Acceleration**: Direct path to $100K+ roles with portfolio-ready projects
+✅ **Industry Networking**: Connections to communities, mentors, and opportunities
+✅ **Certification Path**: Strategic certification roadmap for credibility
 
-**Phase 2: Skill Development (Duration)**  
-- Intermediate concepts and practices
-- Advanced tools and frameworks
-- Real-world project applications
-- Industry best practices
-- Portfolio development
+🏗️ STRUCTURE (Make each phase incredibly detailed and actionable):
 
-**Phase 3: Professional Mastery (Duration)**
-- Advanced techniques and specializations
-- Industry leadership skills
-- Complex project management
-- Continuous learning strategies
-- Career advancement preparation
+**Phase 1: {specialization.replace('_', ' ').title()} Foundation Mastery (4-6 weeks)**
+📚 **Core Mastery Goals:**
+- [List 3-5 specific, measurable learning objectives]
+- [Include industry-standard competency levels]
 
-Each phase should include:
-- Specific learning objectives
-- Recommended tools and resources
-- Practical projects
-- Skill checkpoints
-- Industry connections
+🛠️ **Essential Technology Stack:**
+- [Primary tools with specific versions/configurations]  
+- [Development environment setup with exact specifications]
+- [Industry-standard software and platforms]
 
-Make this roadmap incredibly specific to {specialization.replace('_', ' ')} and valuable for someone at the {experience_level} level."""
+📝 **Hands-On Projects:**
+- [2-3 portfolio-worthy projects with detailed specs]
+- [Real-world applications that demonstrate competency]
+- [Measurable outcomes and success criteria]
+
+📖 **Learning Resources:**
+- [Specific courses, books, tutorials with quality ratings]
+- [Free vs paid options with cost-benefit analysis]
+- [Community resources and expert recommendations]
+
+🎯 **Week-by-Week Milestones:**
+- Week 1-2: [Specific achievements and checkpoints]
+- Week 3-4: [Advanced concepts and project completion]
+- Week 5-6: [Mastery validation and portfolio preparation]
+
+**Phase 2: Advanced {specialization.replace('_', ' ').title()} Development (6-8 weeks)**
+🎓 **Professional-Level Goals:**
+- [Advanced competencies that separate experts from beginners]
+- [Industry-specific problem-solving capabilities]
+
+⚡ **Advanced Tools & Frameworks:**
+- [Professional-grade tools used in enterprise environments]
+- [Integration patterns and architectural considerations]
+- [Performance optimization and best practices]
+
+🏆 **Industry-Standard Projects:**
+- [2-3 complex projects that showcase professional abilities]
+- [Real business problems and solution architectures]
+- [Collaborative development and code review processes]
+
+🌐 **Industry Integration:**
+- [Professional networking opportunities and communities]
+- [Open source contributions and portfolio enhancement]
+- [Mentorship and peer learning connections]
+
+📈 **Career Preparation:**
+- [Interview preparation and technical assessment practice]
+- [Resume and portfolio optimization for {specialization.replace('_', ' ')} roles]
+- [Salary negotiation and career positioning strategies]
+
+**Phase 3: {specialization.replace('_', ' ').title()} Expert & Leadership (8-12 weeks)**
+👑 **Leadership & Expertise Goals:**
+- [Senior-level competencies and thought leadership]
+- [Team leadership and project management skills]
+- [Innovation and strategic thinking capabilities]
+
+🚀 **Cutting-Edge Specializations:**
+- [Emerging technologies and future-forward skills]
+- [Niche expertise areas with high market demand]
+- [Research and development capabilities]
+
+🏗️ **Capstone Projects:**
+- [1-2 comprehensive projects worthy of senior-level professionals]
+- [End-to-end product development or solution architecture]
+- [Public presentation and thought leadership demonstration]
+
+💼 **Professional Advancement:**
+- [Industry conference speaking and content creation]
+- [Advanced certifications and professional recognition]
+- [Entrepreneurial opportunities and consulting readiness]
+- [Mentorship and knowledge transfer capabilities]
+
+🎯 **Success Metrics for Each Phase:**
+- [Specific, measurable outcomes]
+- [Industry-standard benchmarks and assessments]
+- [Portfolio quality and professional recognition indicators]
+
+💰 **Career Impact Projections:**
+- Entry salary expectations: $X-Y for {experience_level} → Expert transition
+- Growth trajectory: Timeline to senior roles and leadership positions  
+- Market positioning: Unique value proposition in {specialization.replace('_', ' ')} field
+
+Make every single detail actionable, specific, and directly applicable to breaking into and excelling in the {specialization.replace('_', ' ')} industry at a professional level. This should be the definitive guide they never need to supplement."""
 
         return base_prompt
 
