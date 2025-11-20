@@ -92,25 +92,49 @@ Achieve expertise and prepare for career opportunities. Focus on advanced concep
                     "structured_plan": {
                         "phases": [
                             {
-                                "phase": "Foundation Building",
+                                "name": "Foundation Building",
+                                "phase": "Foundation Building", 
                                 "duration": "4-6 weeks",
+                                "duration_weeks": 6,
+                                "goals": ["Master fundamental concepts", "Build core skills", "Create first projects"],
                                 "topics": ["Core concepts", "Development setup", "Basic projects", "Best practices"],
-                                "projects": ["Portfolio Project"],
-                                "tools": ["Essential Tools", "Development Environment"]
+                                "projects": [{"name": "Portfolio Project", "description": "Build a comprehensive project showcase"}],
+                                "tools": ["Essential Tools", "Development Environment"],
+                                "resources": [
+                                    {"title": "Free Learning Resources", "provider": "Online Platform", "cost": "Free", "is_paid": False},
+                                    {"title": "Advanced Course", "provider": "Premium Platform", "cost": "$39/month", "is_paid": True}
+                                ],
+                                "checkpoints": ["Complete basics", "Build first project"]
                             },
                             {
+                                "name": "Skill Development",
                                 "phase": "Skill Development", 
                                 "duration": "6-8 weeks",
+                                "duration_weeks": 8,
+                                "goals": ["Develop advanced skills", "Real-world application", "Professional projects"],
                                 "topics": ["Advanced frameworks", "Testing & debugging", "API integration", "Team collaboration"],
-                                "projects": ["Advanced Application"],
-                                "tools": ["Professional Tools", "Testing Frameworks"]
+                                "projects": [{"name": "Advanced Application", "description": "Industry-standard application"}],
+                                "tools": ["Professional Tools", "Testing Frameworks"],
+                                "resources": [
+                                    {"title": "Documentation", "provider": "Official Docs", "cost": "Free", "is_paid": False},
+                                    {"title": "Certification Course", "provider": "Training Platform", "cost": "$199", "is_paid": True}
+                                ],
+                                "checkpoints": ["Master advanced concepts", "Complete certification"]
                             },
                             {
+                                "name": "Professional Mastery",
                                 "phase": "Professional Mastery",
                                 "duration": "8-12 weeks", 
+                                "duration_weeks": 12,
+                                "goals": ["Achieve expertise", "Build portfolio", "Ready for employment"],
                                 "topics": ["System architecture", "DevOps practices", "Production deployment", "Open source contribution"],
-                                "projects": ["Enterprise Application"],
-                                "tools": ["Production Tools", "Monitoring Systems"]
+                                "projects": [{"name": "Enterprise Application", "description": "Comprehensive portfolio piece"}],
+                                "tools": ["Production Tools", "Monitoring Systems"],
+                                "resources": [
+                                    {"title": "Advanced Tutorials", "provider": "Expert Platform", "cost": "Free", "is_paid": False},
+                                    {"title": "Mentorship Program", "provider": "Professional Network", "cost": "$299", "is_paid": True}
+                                ],
+                                "checkpoints": ["Complete portfolio", "Job ready"]
                             }
                         ]
                     },
