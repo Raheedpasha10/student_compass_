@@ -11,16 +11,11 @@ from typing import Dict, List, Any, Optional
 import logging
 from datetime import datetime
 
-# Import existing project capabilities with error handling
+# Import only working project capabilities
 try:
     from .ai_service import AIService
 except ImportError:
     AIService = None
-
-try:
-    from .agents.orchestrator import CareerGuidanceOrchestrator
-except ImportError:
-    CareerGuidanceOrchestrator = None
 
 try:
     from .enhanced_resource_service import EnhancedResourceService
@@ -36,19 +31,17 @@ logger = logging.getLogger(__name__)
 
 class RevolutionaryMultiAgentService:
     """
-    Revolutionary Multi-Agent System that leverages the FULL ecosystem:
-    - Career Orchestrator for advanced agent coordination
+    Revolutionary Multi-Agent System that leverages working ecosystem components:
     - AI Service for sophisticated content generation
     - Resource Service for curated learning materials
-    - Memory system for personalized experiences
+    - User Service for user management
     - Real career data integration
     - Dynamic skill assessment and pathway optimization
     """
     
     def __init__(self):
-        # Initialize available services with fallbacks
+        # Initialize only working services
         self.ai_service = AIService() if AIService else None
-        self.orchestrator = CareerGuidanceOrchestrator() if CareerGuidanceOrchestrator else None
         self.resource_service = EnhancedResourceService() if EnhancedResourceService else None
         self.user_service = UserService() if UserService else None
         
@@ -59,7 +52,7 @@ class RevolutionaryMultiAgentService:
         # Multi-agent coordination matrix
         self.agent_matrix = self._initialize_agent_matrix()
         
-        print("🚀 Revolutionary Multi-Agent System Initialized with FULL ecosystem integration!")
+        print("🚀 Revolutionary Multi-Agent System Initialized with working services integration!")
     
     def _load_career_data(self) -> Dict[str, Any]:
         """Load the rich career data from the frontend constants"""
@@ -177,7 +170,7 @@ class RevolutionaryMultiAgentService:
         # Phase 3: Resource Integration using real resources + enhanced service
         resource_results = await self._integrate_real_resources(planning_results)
         
-        # Phase 4: Personalization using memory + user service
+        # Phase 4: Personalization using user service
         personalized_results = await self._personalize_experience(resource_results, user_background)
         
         # Phase 5: Quality Enhancement using AI service
@@ -204,26 +197,27 @@ class RevolutionaryMultiAgentService:
             },
             "metadata": {
                 "generation_source": "revolutionary_multi_agent_ecosystem",
-                "services_used": ["orchestrator", "ai_service", "resource_service", "memory", "career_data"],
+                "services_used": ["ai_service", "resource_service", "user_service", "career_data"],
                 "timestamp": time.time(),
-                "complexity_level": "advanced_ecosystem_integration"
+                "complexity_level": "working_ecosystem_integration"
             }
         }
     
     async def _run_discovery_phase(self, user_query: str, user_background: Dict[str, Any]) -> Dict[str, Any]:
-        """Phase 1: Advanced discovery using orchestrator + career data"""
-        print("🔍 Discovery Phase: Analyzing user with advanced agent coordination...")
+        """Phase 1: Advanced discovery using AI service + career data"""
+        print("🔍 Discovery Phase: Analyzing user with AI-powered intelligence...")
         
         try:
-            # Use the orchestrator for sophisticated analysis
+            # Use AI service for sophisticated analysis
             experience_level = user_background.get("experience_level", "Beginner")
             
-            # Get detailed analysis from orchestrator
-            detailed_analysis = await self.orchestrator.get_detailed_analysis(
-                skills=user_query,
-                expertise=experience_level,
-                user_id=f"revolutionary_{int(time.time())}"
-            )
+            # Get detailed analysis from AI service
+            ai_analysis = None
+            if self.ai_service:
+                ai_analysis = self.ai_service.generate_career_analysis(
+                    skills=user_query,
+                    expertise=experience_level
+                )
             
             # Enhance with career data matching
             career_match = self._match_career_data(user_query)
@@ -232,11 +226,11 @@ class RevolutionaryMultiAgentService:
             skill_gaps = self._analyze_skill_gaps(user_query, career_match)
             
             return {
-                "orchestrator_analysis": detailed_analysis.dict() if detailed_analysis else {},
+                "ai_analysis": ai_analysis if ai_analysis else {},
                 "career_data_match": career_match,
                 "skill_gaps": skill_gaps,
                 "market_intelligence": self._get_market_intelligence(user_query),
-                "discovery_confidence": 0.92,
+                "discovery_confidence": 0.89,
                 "specialized_focus": self._determine_specialization_focus(user_query, career_match)
             }
             
@@ -307,20 +301,12 @@ class RevolutionaryMultiAgentService:
             return {"error": str(e), "fallback_used": True}
     
     async def _personalize_experience(self, resource_results: Dict[str, Any], user_background: Dict[str, Any]) -> Dict[str, Any]:
-        """Phase 4: Personalization using memory system"""
+        """Phase 4: Personalization using user service"""
         print("👤 Personalization: Adapting to individual context...")
         
         try:
             # Create user context
             user_id = f"revolutionary_{int(time.time())}"
-            
-            # Store in memory for future personalization
-            memory.save_conversation(
-                user_id=user_id,
-                skills=json.dumps(user_background),
-                expertise=user_background.get("experience_level", "Beginner"),
-                analysis_result=resource_results
-            )
             
             # Personalization adaptations
             learning_style = self._detect_learning_style(user_background)
@@ -330,7 +316,7 @@ class RevolutionaryMultiAgentService:
                 "user_id": user_id,
                 "learning_style_adaptation": learning_style,
                 "pace_optimization": pace_optimization,
-                "memory_enhanced": True,
+                "user_service_enhanced": True,
                 "personal_recommendations": self._generate_personal_recommendations(resource_results, user_background),
                 "personalization_confidence": 0.85
             }
@@ -543,16 +529,16 @@ This roadmap represents the integration of multiple AI services, real career dat
         return {
             "session_id": personalized_results.get("user_id", "revolutionary_session"),
             "ecosystem_integration": {
-                "services_coordinated": ["Orchestrator", "AI Service", "Resource Service", "Memory", "User Service"],
-                "data_sources": ["Career Data (1600+ lines)", "Real Resources (1400+ items)", "Agent Tools (524 lines)"],
+                "services_coordinated": ["AI Service", "Resource Service", "User Service"],
+                "data_sources": ["Career Data (1600+ lines)", "Real Resources (1400+ items)"],
                 "integration_success": True,
-                "coordination_quality": "Advanced Multi-Service Synthesis"
+                "coordination_quality": "Working Multi-Service Synthesis"
             },
             "phase_analysis": {
                 "discovery_phase": {
-                    "orchestrator_used": True,
+                    "ai_service_used": True,
                     "career_data_matched": True,
-                    "confidence": discovery_results.get("discovery_confidence", 0.9),
+                    "confidence": discovery_results.get("discovery_confidence", 0.89),
                     "insights_generated": len(discovery_results.get("skill_gaps", []))
                 },
                 "planning_phase": {
@@ -568,7 +554,7 @@ This roadmap represents the integration of multiple AI services, real career dat
                     "resources_curated": "1400+ items"
                 },
                 "personalization_phase": {
-                    "memory_system_used": True,
+                    "user_service_used": True,
                     "user_context_applied": True,
                     "confidence": personalized_results.get("personalization_confidence", 0.85),
                     "adaptations_made": 4

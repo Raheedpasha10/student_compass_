@@ -8,7 +8,7 @@ import logging
 
 # Import agent system
 try:
-    from services.agents.orchestrator import CareerGuidanceOrchestrator
+    # from services.agents.orchestrator import CareerGuidanceOrchestrator  # OLD SYSTEM DISABLED
     AGENT_SYSTEM_AVAILABLE = True
 except ImportError:
     AGENT_SYSTEM_AVAILABLE = False

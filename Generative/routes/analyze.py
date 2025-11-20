@@ -7,7 +7,7 @@ import logging
 
 # Try to import agent orchestrator (optional - will fallback if not available)
 try:
-    from services.agents.orchestrator import CareerGuidanceOrchestrator
+    # from services.agents.orchestrator import CareerGuidanceOrchestrator  # OLD SYSTEM DISABLED
     # Only enable agents when explicitly enabled AND a valid API key is present
     import os
     AGENT_SYSTEM_AVAILABLE = (
