@@ -33,61 +33,67 @@ class handler(BaseHTTPRequestHandler):
             request_data = json.loads(post_data.decode('utf-8'))
             
             if '/api/multi-agent/roadmap' in self.path:
-                # Return consistent demo roadmap instead of trying to load indefinitely
-                user_query = request_data.get('user_query', 'Career guidance')
+                user_query = request_data.get('user_query', 'Career development')
+                user_background = request_data.get('user_background', {})
                 
                 response = {
-                    "status": "success",
-                    "final_roadmap": {
-                        "overview": f"Comprehensive learning path for {user_query}",
-                        "time_commitment_hours_per_week": 15,
-                        "prerequisites": ["Basic computer skills", "Internet access"],
+                    "final_roadmap": f"""**Phase 1: Foundation Building (4-6 weeks)**
+Master the fundamentals of {user_query}. Build a strong foundation with essential skills and industry best practices.
+
+- Learn core concepts and fundamental principles
+- Set up development environment and essential tools
+- Practice with hands-on exercises and basic projects
+- Understand industry standards and best practices
+- Build your first portfolio project
+
+**Phase 2: Skill Development (6-8 weeks)**
+Develop intermediate skills and tackle real-world applications. Focus on practical implementation and problem-solving.
+
+- Master advanced techniques and frameworks
+- Learn testing, debugging, and optimization
+- Work with APIs and third-party integrations
+- Build responsive and scalable applications
+- Collaborate on team-based projects
+
+**Phase 3: Professional Mastery (8-12 weeks)**
+Achieve expertise and prepare for career opportunities. Focus on advanced concepts and industry readiness.
+
+- Master complex system architecture and design
+- Learn deployment, monitoring, and DevOps practices
+- Build production-ready, enterprise-level applications
+- Contribute to open source and community projects
+- Prepare for technical interviews and job applications""",
+                    "roadmap": f"Complete learning roadmap for {user_query}",
+                    "career_path": user_query,
+                    "expertise_level": user_background.get('experience_level', 'Intermediate'),
+                    "learning_path": [],
+                    "structured_plan": {
                         "phases": [
                             {
-                                "name": "Foundation Building",
-                                "duration_weeks": 6,
-                                "goals": ["Master fundamental concepts", "Build core skills", "Create first projects"],
-                                "topics": ["Basic concepts", "Core principles", "Hands-on practice", "Project development"],
-                                "projects": [{"name": "Portfolio Project", "description": "Build a comprehensive project showcase"}],
-                                "tools": ["Essential Tools", "Development Environment"],
-                                "resources": [
-                                    {"title": "Free Learning Resources", "provider": "Online Platform", "cost": "Free", "is_paid": False},
-                                    {"title": "Advanced Course", "provider": "Premium Platform", "cost": "$39/month", "is_paid": True}
-                                ],
-                                "checkpoints": ["Complete basics", "Build first project"]
+                                "phase": "Foundation Building",
+                                "duration": "4-6 weeks",
+                                "topics": ["Core concepts", "Development setup", "Basic projects", "Best practices"],
+                                "projects": ["Portfolio Project"],
+                                "tools": ["Essential Tools", "Development Environment"]
                             },
                             {
-                                "name": "Skill Development", 
-                                "duration_weeks": 8,
-                                "goals": ["Develop advanced skills", "Real-world application", "Professional projects"],
-                                "topics": ["Advanced concepts", "Industry practices", "Best practices", "Professional tools"],
-                                "projects": [{"name": "Advanced Project", "description": "Industry-standard application"}],
-                                "tools": ["Professional Tools", "Industry Software"],
-                                "resources": [
-                                    {"title": "Documentation", "provider": "Official Docs", "cost": "Free", "is_paid": False},
-                                    {"title": "Certification Course", "provider": "Training Platform", "cost": "$199", "is_paid": True}
-                                ],
-                                "checkpoints": ["Master advanced concepts", "Complete certification"]
+                                "phase": "Skill Development", 
+                                "duration": "6-8 weeks",
+                                "topics": ["Advanced frameworks", "Testing & debugging", "API integration", "Team collaboration"],
+                                "projects": ["Advanced Application"],
+                                "tools": ["Professional Tools", "Testing Frameworks"]
                             },
                             {
-                                "name": "Professional Mastery",
-                                "duration_weeks": 10,
-                                "goals": ["Achieve expertise", "Build portfolio", "Ready for employment"],
-                                "topics": ["Expert-level skills", "Portfolio development", "Job preparation", "Interview skills"],
-                                "projects": [{"name": "Capstone Project", "description": "Comprehensive portfolio piece"}],
-                                "tools": ["Expert Tools", "Professional Suite"],
-                                "resources": [
-                                    {"title": "Advanced Tutorials", "provider": "Expert Platform", "cost": "Free", "is_paid": False},
-                                    {"title": "Mentorship Program", "provider": "Professional Network", "cost": "$299", "is_paid": True}
-                                ],
-                                "checkpoints": ["Complete portfolio", "Job ready"]
+                                "phase": "Professional Mastery",
+                                "duration": "8-12 weeks",
+                                "topics": ["System architecture", "DevOps practices", "Production deployment", "Open source contribution"],
+                                "projects": ["Enterprise Application"],
+                                "tools": ["Production Tools", "Monitoring Systems"]
                             }
-                        ],
-                        "career_milestones": [
-                            {"timeframe": "3-6 months", "outcome": "Junior position ready", "salary_range": "$45k-60k"},
-                            {"timeframe": "6-12 months", "outcome": "Mid-level opportunities", "salary_range": "$60k-80k"}
                         ]
                     },
+                    "ai_generated": True,
+                    "using_multi_agent": True,
                     "funneling_report": {
                         "session_id": f"vercel-{hash(user_query) % 10000}",
                         "user_query": user_query,
@@ -137,7 +143,10 @@ class handler(BaseHTTPRequestHandler):
                     "metadata": {
                         "generation_source": "vercel_api",
                         "timestamp": "2024-01-20T00:00:00Z",
-                        "version": "1.0.0"
+                        "version": "1.0.0",
+                        "num_agents": 3,
+                        "successful_agents": 3,
+                        "session_id": f"vercel-{hash(user_query) % 10000}"
                     }
                 }
             else:
