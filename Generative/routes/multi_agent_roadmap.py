@@ -17,11 +17,12 @@ load_dotenv()
 # Import your new service AFTER loading env vars
 from services.multi_agent_service import MultiAgentFunnelService
 from services.enhanced_multi_agent_service import EnhancedMultiAgentService
+from services.revolutionary_multi_agent_service import RevolutionaryMultiAgentService
 
 router = APIRouter(prefix="/api/v2/roadmap", tags=["Multi-Agent Roadmap V2"])
 
-# Global service instance to maintain funneling logs across requests
-multi_agent_service = EnhancedMultiAgentService()
+# Global service instance - Revolutionary Multi-Agent System
+multi_agent_service = RevolutionaryMultiAgentService()
 
 
 # Request/Response Models
@@ -87,14 +88,13 @@ async def generate_multi_agent_roadmap(request: RoadmapRequest):
         if request.background:
             background_dict = request.background.model_dump(exclude_none=True)
         
-        # Generate roadmap using enhanced multi-agent system with debugging
-        print(f"🔍 Processing query: {request.query}")
-        result = await multi_agent_service.generate_enhanced_roadmap(
+        # Generate roadmap using REVOLUTIONARY multi-agent ecosystem
+        print(f"🌟 Revolutionary Processing: {request.query}")
+        result = await multi_agent_service.generate_revolutionary_roadmap(
             user_query=request.query,
             user_background=background_dict
         )
-        print(f"🎯 Result agent insights: {[agent.get('agent_name', 'Unknown') for agent in result.get('agent_insights', [])]}")
-        print(f"🔧 Specialization detected: {result.get('specialization_detected', 'None')}")
+        print(f"🚀 Revolutionary System Results Generated!")
         
         
         # Format response
