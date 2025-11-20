@@ -204,9 +204,9 @@ export const careerAPI = {
       }
       
       console.log('🤖 Generating multi-agent roadmap:', requestData);
-      const response = await api.post('/api/multi-agent/roadmap', {
-        user_query: query,
-        user_background: background || {}
+      const response = await api.post('/api/v2/roadmap/generate', {
+        query: query,
+        background: background || {}
       });
       console.log('✅ Multi-agent roadmap generated:', response.data);
       return response.data;
