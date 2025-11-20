@@ -1,8 +1,23 @@
 {
-  "buildCommand": "cd Generative/frontend && npm install && DISABLE_ESLINT_PLUGIN=true CI=false npm run build && cp -r build/* ../../",
-  "outputDirectory": ".",
-  "installCommand": "npm install --prefix Generative/frontend",
+  "version": 2,
+  "builds": [
+    {
+      "src": "Generative/frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "../../"
+      }
+    },
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
+    }
+  ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
+    },
     {
       "src": "/static/(.*)",
       "dest": "/static/$1"
