@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 
 const FunnelingReport = ({ sessionId, report }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (report) {
+      setTimeout(() => setIsVisible(true), 100);
+    }
+  }, [report]);
 
   if (!report) {
     return (
@@ -26,7 +33,9 @@ const FunnelingReport = ({ sessionId, report }) => {
   };
 
   return (
-    <div className="bg-bg-secondary border border-border-primary rounded-8 p-6 mt-6">
+    <div className={`bg-bg-secondary border border-border-primary rounded-8 p-6 mt-6 transition-all duration-500 ease-out transform ${
+      isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+    }`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-large font-semibold text-text-primary flex items-center gap-2">
           🔍 Multi-Agent Funneling Report
@@ -36,14 +45,23 @@ const FunnelingReport = ({ sessionId, report }) => {
         </h3>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-accent hover:text-accent-hover text-small font-medium"
+          className="text-accent hover:text-accent-hover text-small font-medium transition-all duration-200 flex items-center gap-2"
         >
           {isExpanded ? 'Hide Details' : 'Show Details'}
+          <svg 
+            className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
       </div>
 
       {/* Summary Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
+           style={{ animationDelay: '0.2s' }}>
         <div className="bg-bg-tertiary rounded-6 p-3 border border-border-primary">
           <div className="text-small font-medium text-text-primary mb-1">Agents Used</div>
           <div className="text-title-3 font-semibold text-accent">
@@ -52,8 +70,14 @@ const FunnelingReport = ({ sessionId, report }) => {
         </div>
         <div className="bg-bg-tertiary rounded-6 p-3 border border-border-primary">
           <div className="text-small font-medium text-text-primary mb-1">Success Rate</div>
-          <div className="text-title-3 font-semibold text-green-600">
+          <div className={`text-title-3 font-semibold ${
+            (report.agent_performance?.success_rate_percent || 0) >= 70 ? 'text-green-600' : 
+            (report.agent_performance?.success_rate_percent || 0) >= 40 ? 'text-yellow-600' : 'text-red-600'
+          }`}>
             {report.agent_performance?.success_rate_percent || 0}%
+          </div>
+          <div className="text-xs text-text-secondary mt-1">
+            {report.agent_performance?.successful_agents || 0}/{report.agent_performance?.total_agents || 0} agents
           </div>
         </div>
         <div className="bg-bg-tertiary rounded-6 p-3 border border-border-primary">
@@ -63,9 +87,12 @@ const FunnelingReport = ({ sessionId, report }) => {
           </div>
         </div>
         <div className="bg-bg-tertiary rounded-6 p-3 border border-border-primary">
-          <div className="text-small font-medium text-text-primary mb-1">Total Time</div>
+          <div className="text-small font-medium text-text-primary mb-1">Execution Time</div>
           <div className="text-regular font-medium text-text-primary">
             {report.output_metrics?.total_execution_time || 'N/A'}
+          </div>
+          <div className="text-xs text-text-secondary mt-1">
+            {report.output_metrics?.phases_generated || 0} phases generated
           </div>
         </div>
       </div>
@@ -98,6 +125,12 @@ const FunnelingReport = ({ sessionId, report }) => {
                 <div className="text-small text-text-secondary">
                   {typeof agent.response_time === 'string' ? agent.response_time : 'N/A'}
                 </div>
+                {!agent.success && agent.error && (
+                  <div className="text-xs text-red-500 mt-1 max-w-xs truncate" title={agent.error}>
+                    {agent.error.includes('rate_limit') ? '⚠️ Rate limit' : 
+                     agent.error.includes('leaked') ? '🔒 API key issue' : '❌ Error'}
+                  </div>
+                )}
               </div>
             </div>
           ))}
