@@ -11,7 +11,7 @@ import uuid
 import re
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-import httpx
+# import httpx  # Not needed for this implementation
 from groq import Groq
 import google.generativeai as genai
 

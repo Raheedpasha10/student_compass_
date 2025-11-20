@@ -87,11 +87,14 @@ async def generate_multi_agent_roadmap(request: RoadmapRequest):
         if request.background:
             background_dict = request.background.model_dump(exclude_none=True)
         
-        # Generate roadmap using enhanced multi-agent system
+        # Generate roadmap using enhanced multi-agent system with debugging
+        print(f"🔍 Processing query: {request.query}")
         result = await multi_agent_service.generate_enhanced_roadmap(
             user_query=request.query,
             user_background=background_dict
         )
+        print(f"🎯 Result agent insights: {[agent.get('agent_name', 'Unknown') for agent in result.get('agent_insights', [])]}")
+        print(f"🔧 Specialization detected: {result.get('specialization_detected', 'None')}")
         
         
         # Format response

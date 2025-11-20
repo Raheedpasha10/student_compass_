@@ -25,6 +25,32 @@ const SimplifiedUltimateRoadmap = () => {
   const navigate = useNavigate();
   const { currentSkills, currentExpertise, showGlobalFunnelingReport } = useAppContext();
 
+  // Enhanced agent detection for frontend display
+  const getSpecializedAgents = React.useCallback((skills) => {
+    const skillsLower = skills?.toLowerCase() || '';
+    
+    if (skillsLower.includes('data science') || skillsLower.includes('machine learning') || skillsLower.includes('ai')) {
+      return ['Data Science Lead', 'ML Research Scientist', 'Analytics Expert'];
+    }
+    if (skillsLower.includes('web development') || skillsLower.includes('frontend') || skillsLower.includes('react')) {
+      return ['Frontend Expert', 'Backend Architect', 'Full Stack Mentor'];
+    }
+    if (skillsLower.includes('ui') || skillsLower.includes('ux') || skillsLower.includes('design')) {
+      return ['UX Research Director', 'Product Design Lead', 'Interaction Design Expert'];
+    }
+    if (skillsLower.includes('cybersecurity') || skillsLower.includes('security')) {
+      return ['Security Architect', 'Penetration Testing Expert', 'Compliance Specialist'];
+    }
+    if (skillsLower.includes('marketing') || skillsLower.includes('digital marketing')) {
+      return ['Marketing Strategy Director', 'Growth Hacking Expert', 'Content Marketing Specialist'];
+    }
+    if (skillsLower.includes('mobile') || skillsLower.includes('app development')) {
+      return ['Mobile App Architect', 'Cross Platform Expert', 'Native Development Guru'];
+    }
+    
+    return ['Strategic Planner', 'Practical Guide', 'Technical Expert'];
+  }, []);
+
   // Helper functions for platform styling
   const getPlatformColor = (platform) => {
     const colors = {
