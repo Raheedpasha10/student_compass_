@@ -204,7 +204,10 @@ export const careerAPI = {
       }
       
       console.log('🤖 Generating multi-agent roadmap:', requestData);
-      const response = await api.post('/api/v2/roadmap/generate', requestData);
+      const response = await api.post('/api/multi-agent/roadmap', {
+        user_query: query,
+        user_background: background || {}
+      });
       console.log('✅ Multi-agent roadmap generated:', response.data);
       return response.data;
     } catch (error) {
@@ -216,7 +219,7 @@ export const careerAPI = {
   // Check multi-agent system health
   checkMultiAgentHealth: async () => {
     try {
-      const response = await api.get('/api/v2/roadmap/health');
+      const response = await api.get('/health');
       return response.data;
     } catch (error) {
       console.error('Multi-agent health check error:', error);
