@@ -146,27 +146,8 @@ const SimplifiedUltimateRoadmap = () => {
         setUsingDemoData(false);
         setAgentStatus({ current: 'Initializing Multi-Agent AI System...', agents: [] });
 
-        // Smart session-based caching (1 hour)
-        const cacheKey = `roadmap_${ROADMAP_CACHE_VERSION}_${currentSkills}_${currentExpertise}`;
-        const cached = sessionStorage.getItem(cacheKey);
-        
-        if (cached) {
-          try {
-            const { timestamp, data } = JSON.parse(cached);
-            // Use cache if less than 1 hour old
-            if (Date.now() - timestamp < 60 * 60 * 1000) {
-              console.log('✅ Using cached roadmap (session storage)');
-              const learning_path = buildLearningPath(data);
-              const finalData = { ...data, learning_path: learning_path || [] };
-              setRoadmapData(finalData);
-              setUsingDemoData(false);
-              setLoading(false);
-              return;
-            }
-          } catch (e) {
-            console.log('Cache parse error, generating fresh roadmap');
-          }
-        }
+        // For Vercel deployment - generate content locally without backend dependency
+        console.log('🎯 Generating roadmap locally for reliable deployment');
         
         if (!currentSkills || !currentExpertise) {
           throw new Error('Skills and expertise are required to generate a personalized roadmap');
@@ -276,7 +257,7 @@ const SimplifiedUltimateRoadmap = () => {
     if (currentSkills && currentExpertise) {
       fetchRoadmapData();
     }
-  }, [currentSkills, currentExpertise]);
+  }, []); // Run only once - prevent re-execution that clears roadmap data
 
   const fetchResources = async (type) => {
     setLoadingResources(true);

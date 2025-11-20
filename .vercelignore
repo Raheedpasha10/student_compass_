@@ -1,4 +1,12 @@
 # Vercel Project
-Generative/
-node_modules/
-*.py
+Generative/*.py
+Generative/routes/
+Generative/services/
+Generative/models/
+Generative/config/
+Generative/tests/
+*.pyc
+__pycache__/
+.venv/
+Multi-Agent implementation/
+netlify.toml

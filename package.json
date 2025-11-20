@@ -1,0 +1,9 @@
+{
+  "name": "student-compass",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd Generative/frontend && npm install && npm run build && cd ../.. && cp -r Generative/frontend/build/* .",
+    "start": "cd Generative/frontend && npm start"
+  }
+}
