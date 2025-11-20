@@ -16,11 +16,12 @@ load_dotenv()
 
 # Import your new service AFTER loading env vars
 from services.multi_agent_service import MultiAgentFunnelService
+from services.enhanced_multi_agent_service import EnhancedMultiAgentService
 
 router = APIRouter(prefix="/api/v2/roadmap", tags=["Multi-Agent Roadmap V2"])
 
 # Global service instance to maintain funneling logs across requests
-multi_agent_service = MultiAgentFunnelService()
+multi_agent_service = EnhancedMultiAgentService()
 
 
 # Request/Response Models
@@ -86,8 +87,8 @@ async def generate_multi_agent_roadmap(request: RoadmapRequest):
         if request.background:
             background_dict = request.background.model_dump(exclude_none=True)
         
-        # Generate roadmap using multi-agent system
-        result = await multi_agent_service.generate_funneled_roadmap(
+        # Generate roadmap using enhanced multi-agent system
+        result = await multi_agent_service.generate_enhanced_roadmap(
             user_query=request.query,
             user_background=background_dict
         )
@@ -377,7 +378,7 @@ async def get_demo_report():
     """
     try:
         # Create a demo service instance
-        service = MultiAgentFunnelService()
+        service = EnhancedMultiAgentService()
         
         # Generate a demo report structure
         demo_report = {
