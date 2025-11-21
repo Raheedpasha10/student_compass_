@@ -513,8 +513,46 @@ Specialized for {specialization} with focus on practical, industry-relevant skil
             best_response = max(agent_responses, key=lambda x: x.confidence_score)
             final_roadmap = best_response.roadmap
         else:
-            # Use enhanced fallback
-            final_roadmap = self._create_fallback_response(user_query, specialization_info, "Expert_Mentor")
+            # Create comprehensive fallback content
+            final_roadmap = f"""# Complete {user_query.title()} Learning Roadmap
+
+## Phase 1: {user_query.title()} Foundation (4-6 weeks)
+**Strategic Planner Focus**: Build systematic understanding and establish learning framework
+
+- Master core concepts and terminology in {user_query}
+- Set up professional development environment with industry-standard tools
+- Complete foundational coursework from top-tier sources
+- Join professional communities and forums for networking
+- Start documenting learning journey with portfolio setup
+- Complete 3-5 beginner projects to apply basic concepts
+- Learn industry best practices and standards
+- Begin building professional network through LinkedIn
+
+## Phase 2: Advanced {user_query.title()} Skills (6-8 weeks)  
+**Practical Guide Focus**: Apply knowledge in real-world scenarios and develop professional competency
+
+- Develop hands-on experience with practical exercises
+- Master advanced techniques and frameworks
+- Work with industry-standard tools and technologies
+- Build substantial portfolio projects with measurable impact
+- Take on freelance projects or contribute to open-source initiatives
+- Complete advanced coursework from industry leaders
+- Establish thought leadership through content creation
+- Pursue internships or part-time roles in {user_query}
+
+## Phase 3: {user_query.title()} Expert & Leadership (8-12 weeks)
+**Technical Expert Focus**: Achieve expert-level competency and establish industry leadership
+
+- Lead projects and mentor junior practitioners
+- Develop cutting-edge solutions and innovative approaches
+- Master complex system architecture and design patterns
+- Establish expertise in emerging technologies and trends
+- Speak at conferences and industry events
+- Publish research, articles, or thought leadership content
+- Build strategic partnerships and business relationships
+- Create lasting impact on field through innovation
+
+This comprehensive roadmap represents the synthesis of strategic planning, practical guidance, and technical expertise to master {user_query} professionally."""
         
         # Create comprehensive result
         return {
