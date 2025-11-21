@@ -190,6 +190,9 @@ const SimplifiedUltimateRoadmap = () => {
         
         // Use Multi-Agent System for comprehensive analysis
         try {
+          console.log('🔄 Starting multi-agent API call...');
+          const startTime = Date.now();
+          
           const multiAgentResult = await careerAPI.generateMultiAgentRoadmap(
             `I want to learn ${currentSkills} and become proficient in this field`,
             {
@@ -200,6 +203,11 @@ const SimplifiedUltimateRoadmap = () => {
             },
             true // include agent details
           );
+          
+          const duration = Date.now() - startTime;
+          console.log(`⏱️ Multi-agent call completed in ${duration}ms`);
+          console.log('📊 Multi-agent result keys:', Object.keys(multiAgentResult));
+          console.log('📝 Final roadmap empty?:', !multiAgentResult.final_roadmap || multiAgentResult.final_roadmap.length === 0);
 
           console.log('✅ Multi-Agent AI Analysis Complete!');
           console.log(`📊 ${multiAgentResult.metadata?.successful_agents || 3}/3 AI agents contributed`);
@@ -218,7 +226,7 @@ const SimplifiedUltimateRoadmap = () => {
                               roadmapText.match(/Phase \d+:.*?[\s\S]*?(?=Phase \d+:|$)/gi);
             
             // If no phases found, create structure from the content
-            if (!phaseMatches && roadmapText) {
+            if (!phaseMatches && roadmapText && roadmapText.trim()) {
               console.log('No standard phases found, creating structure from content...');
               // Split by major sections or create default phases
               const sections = roadmapText.split(/\n\n+/).filter(s => s.trim().length > 50);
@@ -230,6 +238,14 @@ const SimplifiedUltimateRoadmap = () => {
                 // Create a single comprehensive phase
                 phaseMatches = [`**Phase 1: Complete Learning Program**\n\n${roadmapText}`];
               }
+            } else if (!roadmapText || !roadmapText.trim()) {
+              console.error('❌ Empty roadmap content received from backend!');
+              // Create fallback content
+              phaseMatches = [
+                `**Phase 1: ${currentSkills} Foundation**\n\nBegin your journey in ${currentSkills} with fundamental concepts and core skills.`,
+                `**Phase 2: ${currentSkills} Development**\n\nBuild practical experience and develop intermediate skills in ${currentSkills}.`,
+                `**Phase 3: ${currentSkills} Mastery**\n\nAchieve advanced proficiency and expert-level skills in ${currentSkills}.`
+              ];
             }
             
             if (phaseMatches && phaseMatches.length > 0) {
