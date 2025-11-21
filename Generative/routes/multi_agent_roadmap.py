@@ -21,8 +21,8 @@ from services.revolutionary_multi_agent_service import RevolutionaryMultiAgentSe
 
 router = APIRouter(prefix="/api/v2/roadmap", tags=["Multi-Agent Roadmap V2"])
 
-# Global service instance - Revolutionary Multi-Agent System
-multi_agent_service = RevolutionaryMultiAgentService()
+# Global service instance - Enhanced Multi-Agent System  
+multi_agent_service = EnhancedMultiAgentService()
 
 
 # Request/Response Models
@@ -88,13 +88,13 @@ async def generate_multi_agent_roadmap(request: RoadmapRequest):
         if request.background:
             background_dict = request.background.model_dump(exclude_none=True)
         
-        # Generate roadmap using REVOLUTIONARY multi-agent ecosystem
-        print(f"🌟 Revolutionary Processing: {request.query}")
-        result = await multi_agent_service.generate_revolutionary_roadmap(
+        # Generate roadmap using enhanced multi-agent system
+        print(f"🤖 Multi-Agent Processing: {request.query}")
+        result = await multi_agent_service.generate_enhanced_roadmap(
             user_query=request.query,
             user_background=background_dict
         )
-        print(f"🚀 Revolutionary System Results Generated!")
+        print(f"✅ Multi-Agent Results Generated!")
         
         
         # Format response

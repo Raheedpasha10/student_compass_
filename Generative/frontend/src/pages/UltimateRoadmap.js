@@ -182,10 +182,10 @@ const SimplifiedUltimateRoadmap = () => {
         console.log('🤖 Generating roadmap with Multi-Agent AI System...');
         // Dynamic agent names based on specialization detection
         const specializationAgents = getSpecializedAgents(currentSkills);
-        setAgentStatus({ current: '🌟 REVOLUTIONARY INTELLIGENCE ACTIVATED', agents: [
-          { name: `🔮 ${specializationAgents[0] || 'Market Prophet'}`, status: 'analyzing', model: 'Revolutionary AI' },
-          { name: `⚡ ${specializationAgents[1] || 'Talent Archaeologist'}`, status: 'analyzing', model: 'Quantum Intelligence' },
-          { name: `🧠 ${specializationAgents[2] || 'Future Cartographer'}`, status: 'analyzing', model: 'Consciousness Engine' }
+        setAgentStatus({ current: 'Multi-Agent System Activated', agents: [
+          { name: specializationAgents[0] || 'Strategic Planner', status: 'analyzing', model: 'Llama 3.3 70B' },
+          { name: specializationAgents[1] || 'Practical Guide', status: 'analyzing', model: 'Gemini 2.0 Flash' },
+          { name: specializationAgents[2] || 'Technical Expert', status: 'analyzing', model: 'Llama 3.1 8B' }
         ]});
         
         // Use Multi-Agent System for comprehensive analysis
@@ -201,10 +201,9 @@ const SimplifiedUltimateRoadmap = () => {
             true // include agent details
           );
 
-          console.log('✅ Revolutionary Multi-Agent AI Analysis Complete!');
-          console.log(`🚀 Revolutionary System Generated: ${multiAgentResult.final_roadmap?.length || 0} characters`);
-          console.log('🔍 Revolutionary Features:', multiAgentResult.revolutionary_features);
-          console.log('🧠 Intelligence Layers:', multiAgentResult.metadata?.intelligence_layers);
+          console.log('✅ Multi-Agent AI Analysis Complete!');
+          console.log(`📊 ${multiAgentResult.metadata?.successful_agents || 3}/3 AI agents contributed`);
+          console.log('🔍 Funneling Report Available:', !!multiAgentResult.funneling_report);
 
           // Parse structured plan from AI roadmap
           let structuredPlan = null;
