@@ -209,23 +209,57 @@ const SimplifiedUltimateRoadmap = () => {
           let structuredPlan = null;
           try {
             const roadmapText = multiAgentResult.final_roadmap;
-            const phaseMatches = roadmapText.match(/\*\*Phase \d+:.*?\*\*[\s\S]*?(?=\*\*Phase \d+:|$)/gi);
+            
+            // Better parsing for the actual content structure
+            const phaseMatches = roadmapText.match(/\*\*Phase \d+:.*?\*\*[\s\S]*?(?=\*\*Phase \d+:|$)/gi) ||
+                               roadmapText.match(/##\s*Phase \d+:.*?[\s\S]*?(?=##\s*Phase \d+:|$)/gi) ||
+                               roadmapText.match(/Phase \d+:.*?[\s\S]*?(?=Phase \d+:|$)/gi);
             
             if (phaseMatches && phaseMatches.length > 0) {
               structuredPlan = {
                 phases: phaseMatches.map((phaseText, index) => {
-                  const titleMatch = phaseText.match(/\*\*Phase \d+: (.*?)\*\*/);
-                  const title = titleMatch ? titleMatch[1].split('(')[0].trim() : `Phase ${index + 1}`;
+                  // Better title extraction
+                  const titleMatch = phaseText.match(/(?:\*\*)?(?:##\s*)?Phase \d+:\s*(.*?)(?:\*\*)?(?:\(|$)/i);
+                  const title = titleMatch ? titleMatch[1].trim() : `Phase ${index + 1}`;
+                  
+                  // Better duration extraction
                   const durationMatch = phaseText.match(/\(([^)]*(?:month|week|day)[^)]*)\)/i);
                   const duration = durationMatch ? durationMatch[1] : `${index * 2 + 2}-${(index + 1) * 2 + 2} weeks`;
-                  const topicMatches = phaseText.match(/[-•]\s*([^\n]+)/g);
-                  const topics = topicMatches ? topicMatches.slice(0, 5).map(t => t.replace(/^[-•]\s*/, '').trim()) : [];
+                  
+                  // Extract actual learning objectives and topics
+                  const topicMatches = phaseText.match(/[-•]\s*([^\n]+)/g) ||
+                                    phaseText.match(/\d+\.\s*\*\*([^*]+)\*\*/g) ||
+                                    phaseText.match(/\n\s*([A-Z][^:\n]{10,})/g);
+                  
+                  let topics = [];
+                  if (topicMatches) {
+                    topics = topicMatches
+                      .slice(0, 5)
+                      .map(t => t.replace(/^[-•]\s*/, '').replace(/^\d+\.\s*\*\*/, '').replace(/\*\*$/, '').trim())
+                      .filter(t => t.length > 5 && !t.includes('standard competency level'));
+                  }
+                  
+                  // If no good topics found, extract meaningful content from goals section
+                  if (topics.length === 0) {
+                    const goalsMatch = phaseText.match(/Goals?:[\s\S]*?(?=\n\n|\*\*|\n[A-Z])/i);
+                    if (goalsMatch) {
+                      const goals = goalsMatch[0].split(/\d+\./).slice(1, 5);
+                      topics = goals.map(g => g.split(':')[0].trim().replace(/\*\*/g, '')).filter(t => t.length > 5);
+                    } else {
+                      // Extract key sections as fallback
+                      const sections = phaseText.match(/\*\*([^*]+)\*\*/g);
+                      if (sections) {
+                        topics = sections.slice(1, 6).map(s => s.replace(/\*\*/g, '').trim());
+                      }
+                    }
+                  }
                   
                   return {
                     phase: title,
                     duration: duration,
-                    topics: topics,
-                    projects: []
+                    topics: topics.slice(0, 5),
+                    projects: [],
+                    content: phaseText.slice(0, 500) // Store full content for view details
                   };
                 })
               };
