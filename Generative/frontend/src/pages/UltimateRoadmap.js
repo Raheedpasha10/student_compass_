@@ -283,8 +283,8 @@ const SimplifiedUltimateRoadmap = () => {
             }
           } catch (e) {
             console.warn('Failed to parse structured plan:', e);
-            console.log('Raw roadmap text length:', roadmapText?.length);
-            console.log('Raw roadmap preview:', roadmapText?.substring(0, 200));
+            console.log('Raw roadmap text length:', multiAgentResult.final_roadmap?.length);
+            console.log('Raw roadmap preview:', multiAgentResult.final_roadmap?.substring(0, 200));
           }
           
           // Debug logging
