@@ -527,7 +527,7 @@ Specialized for {specialization} with focus on practical, industry-relevant skil
                 {
                     "agent_name": r.agent_name,
                     "confidence": r.confidence_score,
-                    "focus": r.metadata.get("focus_areas", []),
+                    "focus": ", ".join(r.metadata.get("focus_areas", [])) if isinstance(r.metadata.get("focus_areas"), list) else str(r.metadata.get("focus_areas", "General")),
                     "preview": r.roadmap[:200] + "..." if len(r.roadmap) > 200 else r.roadmap,
                     "provider": r.metadata.get("provider", "unknown"),
                     "execution_time": r.metadata.get("execution_time", "N/A")

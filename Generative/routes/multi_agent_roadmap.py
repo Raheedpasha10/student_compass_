@@ -90,11 +90,21 @@ async def generate_multi_agent_roadmap(request: RoadmapRequest):
         
         # Generate roadmap using enhanced multi-agent system
         print(f"🤖 Multi-Agent Processing: {request.query}")
-        result = await multi_agent_service.generate_enhanced_roadmap(
-            user_query=request.query,
-            user_background=background_dict
-        )
-        print(f"✅ Multi-Agent Results Generated!")
+        try:
+            result = await multi_agent_service.generate_enhanced_roadmap(
+                user_query=request.query,
+                user_background=background_dict
+            )
+            print(f"✅ Multi-Agent Results Generated!")
+        except Exception as e:
+            print(f"❌ Multi-Agent Error: {e}")
+            # Fallback to basic response
+            result = {
+                "final_roadmap": f"# {request.query.title()} Learning Path\n\nComplete roadmap for mastering {request.query}.",
+                "agent_insights": [],
+                "funneling_report": {},
+                "metadata": {"error": str(e)}
+            }
         
         
         # Format response
